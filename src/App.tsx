@@ -71,20 +71,14 @@ function App() {
 
   // Load data when selected date changes
   useEffect(() => {
-    loadData(selectedDate);
+    // Only load data on initial mount, not on date changes
+    // User will manually refresh when needed
   }, [selectedDate]);
 
+  // Load data only on initial mount
   useEffect(() => {
     loadData(selectedDate);
-    
-    // Auto-reload every 5 minutes for live data (only when online)
-    const interval = setInterval(() => {
-      if (isOnline) {
-        loadData(selectedDate);
-      }
-    }, 300000);
-    return () => clearInterval(interval);
-  }, [isOnline, selectedDate]);
+  }, []); // Empty dependency array - only runs once on mount
 
   // Filter matches and maintain grouping
   const filteredGroupedMatches = React.useMemo(() => {
@@ -246,7 +240,7 @@ function App() {
                 </button>
               </div>
               <p className="text-gray-600">
-                Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
+                Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} {!isOnline && '(Offline)'}
               </p>
               {error && (
                 <div className="flex items-center gap-2 mt-2 text-red-600">
@@ -287,7 +281,7 @@ function App() {
                 }`}
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Loading...' : isOnline ? 'Reload Data' : 'Offline'}
+                {loading ? 'Loading...' : isOnline ? 'Refresh Data' : 'Offline'}
               </button>
               
               <button
