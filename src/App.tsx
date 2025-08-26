@@ -288,12 +288,16 @@ function App() {
                   if (window.totelepepExtractor) {
                     window.totelepepExtractor.clearCache();
                   }
+                  // Also clear match-specific cache
+                  if (window.matchSpecificExtractor) {
+                    window.matchSpecificExtractor.clearCache();
+                  }
                   loadData(selectedDate);
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"
               >
                 <Database className="w-4 h-4" />
-                Extract Matches
+                Extract with Real Odds
               </button>
             </div>
           </div>
