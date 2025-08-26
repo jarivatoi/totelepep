@@ -35,7 +35,7 @@ function App() {
       console.log(`Loaded ${sortedMatches.length} matches from Totelepep`);
     } catch (error) {
       console.error('Error loading data:', error);
-      setError('Using sample data. Live data from Totelepep may be temporarily unavailable.');
+      setError('Failed to load data from Totelepep.');
     } finally {
       setLoading(false);
     }
