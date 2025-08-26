@@ -256,6 +256,10 @@ function App() {
               <button
                 onClick={() => {
                   console.log('🔍 Manual extraction triggered');
+                  // Force fresh extraction by clearing cache first
+                  if (window.totelepepExtractor) {
+                    window.totelepepExtractor.clearCache();
+                  }
                   loadData(selectedDate);
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"

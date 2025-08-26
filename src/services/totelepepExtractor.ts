@@ -154,6 +154,28 @@ class TotelepepExtractor {
       const matchEntries = matchDataString.split('|').filter(entry => entry.trim());
       console.log(`🔍 Found ${matchEntries.length} match entries in matchData`);
       
+      // Log the first few complete entries to see the full structure
+      console.log('📄 COMPLETE MATCH DATA ANALYSIS:');
+      matchEntries.slice(0, 3).forEach((entry, index) => {
+        console.log(`\n🔍 COMPLETE Entry ${index}:`);
+        console.log(`📄 Full entry (${entry.length} chars): ${entry}`);
+        
+        const fields = entry.split(';');
+        console.log(`📊 Total fields: ${fields.length}`);
+        
+        // Log ALL fields with their positions
+        fields.forEach((field, fieldIndex) => {
+          console.log(`   Field ${fieldIndex}: "${field}"`);
+        });
+        
+        // Look for additional odds patterns in the complete entry
+        const allOddsInEntry = this.findAllOddsInEntry(entry);
+        console.log(`📈 All odds found in entry: ${allOddsInEntry.length} total`);
+        allOddsInEntry.forEach((odds, oddsIndex) => {
+          console.log(`   Odds ${oddsIndex}: ${odds.value} (position: ${odds.position}, context: "${odds.context}")`);
+        });
+      });
+      
       for (let i = 0; i < matchEntries.length; i++) {
         const entry = matchEntries[i];
         const match = this.parseTotelepepMatchEntry(entry, i);
@@ -168,6 +190,50 @@ class TotelepepExtractor {
     }
     
     return matches;
+  }
+
+  private findAllOddsInEntry(entry: string): Array<{value: number, position: number, context: string}> {
+    const allOdds: Array<{value: number, position: number, context: string}> = [];
+    const fields = entry.split(';');
+    
+    fields.forEach((field, index) => {
+      const trimmedField = field.trim();
+      
+      // Look for decimal odds patterns
+      const oddsPatterns = [
+        /^\d{1,3}\.\d{1,3}$/,  // 1.50, 2.25
+        /^\d{1,3}$/,           // 150, 225 (could be 1.50, 2.25)
+        /^\d{4}$/,             // 1500, 2250 (could be 1.500, 2.250)
+      ];
+      
+      const isOddsLike = oddsPatterns.some(pattern => pattern.test(trimmedField));
+      
+      if (isOddsLike) {
+        let oddsValue = parseFloat(trimmedField);
+        
+        // Convert formats: 150 -> 1.50, 1500 -> 1.500
+        if (oddsValue >= 100 && oddsValue <= 9999 && !trimmedField.includes('.')) {
+          if (oddsValue >= 1000) {
+            oddsValue = oddsValue / 1000; // 1500 -> 1.5
+          } else {
+            oddsValue = oddsValue / 100;  // 150 -> 1.5
+          }
+        }
+        
+        // Only realistic betting odds
+        if (oddsValue >= 1.01 && oddsValue <= 50.0) {
+          const context = `${fields[index-2] || ''} | ${fields[index-1] || ''} | [${trimmedField}] | ${fields[index+1] || ''} | ${fields[index+2] || ''}`;
+          
+          allOdds.push({
+            value: oddsValue,
+            position: index,
+            context: context.trim()
+          });
+        }
+      }
+    });
+    
+    return allOdds;
   }
 
   private parseTotelepepMatchEntry(entry: string, index: number): TotelepepMatch | null {
@@ -1218,6 +1284,12 @@ class TotelepepExtractor {
       data: matches,
       timestamp: Date.now()
     });
+  }
+
+  // Clear cache for fresh extraction
+  clearCache(): void {
+    this.cache.clear();
+    console.log('🗑️ Cache cleared - next extraction will be fresh');
   }
 
   // Sort matches by date and time
