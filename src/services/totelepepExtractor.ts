@@ -53,7 +53,7 @@ class TotelepepExtractor {
       // Ensure all matches have the correct date
       matches.forEach(match => {
         if (!match.date || match.date === new Date().toISOString().split('T')[0]) {
-          match.date = date;
+          match.date = this.getTodayDate();
         }
       });
       
