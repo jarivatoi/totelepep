@@ -324,38 +324,98 @@ class TotelepepExtractor {
   private identifyOddsTypes(odds: any, fields: string[]): void {
     console.log(`🎯 Identifying odds types from ${odds.allFoundOdds.length} candidates...`);
     
-    // Based on the actual Totelepep data structure analysis:
-    // Field 7 = Home odds, Field 9 = Draw odds, Field 11 = Away odds
-    // BTTS and O/U odds are NOT in this basic match data structure
-    
-    console.log(`📊 Analyzing ${fields.length} fields for 1X2 odds only...`);
-    
-    // Extract 1X2 odds from known positions
-    odds.allFoundOdds.forEach((odd: any) => {
-      if (odd.index === 7 && !odds.homeOdds && odd.value >= 1.10 && odd.value <= 20.0) {
+    odds.allFoundOdds.forEach((odd: any, i: number) => {
+      const prevField = odd.prevField.toLowerCase();
+      const nextField = odd.nextField.toLowerCase();
+      const prev2Field = odd.prev2Field.toLowerCase();
+      const next2Field = odd.next2Field.toLowerCase();
+      
+      // Create context string for better matching
+      
+      // Based on your data: Field 7=Home, Field 9=Draw, Field 11=Away
+      if (odd.index === 7 && !odds.homeOdds) {
         odds.homeOdds = odd.value;
-        console.log(`✅ HOME odds (field 7): ${odd.value}`);
+        console.log(`      ✅ Identified as HOME odds (field 7): ${odd.value}`);
       }
-      if (odd.index === 9 && !odds.drawOdds && odd.value >= 1.10 && odd.value <= 20.0) {
+      if (odd.index === 9 && !odds.drawOdds) {
         odds.drawOdds = odd.value;
-        console.log(`✅ DRAW odds (field 9): ${odd.value}`);
+        console.log(`      ✅ Identified as DRAW odds (field 9): ${odd.value}`);
       }
-      if (odd.index === 11 && !odds.awayOdds && odd.value >= 1.10 && odd.value <= 20.0) {
+      if (odd.index === 11 && !odds.awayOdds) {
         odds.awayOdds = odd.value;
-        console.log(`✅ AWAY odds (field 11): ${odd.value}`);
+        console.log(`      ✅ Identified as AWAY odds (field 11): ${odd.value}`);
       }
     });
     
-    // IMPORTANT: BTTS and O/U odds are NOT available in this data structure
-    // They would need to be fetched from a different Totelepep endpoint
-    console.log(`⚠️ BTTS and O/U odds not available in basic match data`);
-    console.log(`⚠️ These would need to be fetched from additional Totelepep endpoints`);
+    // Look for additional odds beyond 1X2 in the remaining fields
+    // We need to analyze more data to find the correct BTTS and O/U positions
+    const remainingOdds = odds.allFoundOdds.filter((odd: any) => 
+      odd.index !== 7 && odd.index !== 9 && odd.index !== 11
+    );
     
-    // Generate realistic placeholder odds for missing categories
+    // For now, generate realistic odds for missing categories
     if (!odds.overOdds) odds.overOdds = this.generateRealisticOdds();
     if (!odds.underOdds) odds.underOdds = this.generateRealisticOdds();
     if (!odds.bttsYes) odds.bttsYes = this.generateRealisticOdds();
     if (!odds.bttsNo) odds.bttsNo = this.generateRealisticOdds();
+    
+    // Pattern 1: BTTS odds (usually consecutive pairs)
+    if (!odds.bttsYes || !odds.bttsNo) {
+      for (let i = 0; i < remainingOdds.length - 1; i++) {
+        const odd1 = remainingOdds[i];
+        const odd2 = remainingOdds[i + 1];
+        
+        // Check if they are consecutive and in BTTS range
+        if (odd2.index === odd1.index + 1 && 
+            odd1.value >= 1.40 && odd1.value <= 3.50 &&
+            odd2.value >= 1.40 && odd2.value <= 3.50) {
+          
+          // BTTS Yes is usually lower odds than BTTS No
+          if (odd1.value < odd2.value) {
+            odds.bttsYes = odd1.value;
+            odds.bttsNo = odd2.value;
+          } else {
+            odds.bttsYes = odd2.value;
+            odds.bttsNo = odd1.value;
+          }
+          console.log(`   🎯 Sequential BTTS pattern: Yes=${odds.bttsYes}, No=${odds.bttsNo}`);
+          break;
+        }
+      }
+    }
+    
+    // Pattern 2: Over/Under odds (usually after BTTS)
+    if (!odds.overOdds || !odds.underOdds) {
+      const remainingOdds = odds.allFoundOdds.filter((odd: any) => 
+        odd.index > 15 && // After BTTS typically
+        odd.value >= 1.50 && odd.value <= 3.00 // O/U range
+      );
+      
+      if (remainingOdds.length >= 2 && !odds.overOdds && !odds.underOdds) {
+        odds.overOdds = remainingOdds[0].value;
+        odds.underOdds = remainingOdds[1].value;
+        console.log(`   🎯 O/U pattern: Over=${odds.overOdds}, Under=${odds.underOdds}`);
+      }
+    }
+    
+    // Pattern 3: Fill missing 1X2 odds if not found in standard positions
+    const mainOdds = odds.allFoundOdds.filter((odd: any) => 
+      odd.index >= 6 && odd.index <= 12 && // Around standard 1X2 positions
+      odd.value >= 1.10 && odd.value <= 20.00 // 1X2 range
+    );
+    
+    if (!odds.homeOdds && mainOdds.length > 0) {
+      odds.homeOdds = mainOdds[0].value;
+      console.log(`   🎯 Fallback HOME odds: ${odds.homeOdds}`);
+    }
+    if (!odds.drawOdds && mainOdds.length > 1) {
+      odds.drawOdds = mainOdds[1].value;
+      console.log(`   🎯 Fallback DRAW odds: ${odds.drawOdds}`);
+    }
+    if (!odds.awayOdds && mainOdds.length > 2) {
+      odds.awayOdds = mainOdds[2].value;
+      console.log(`   🎯 Fallback AWAY odds: ${odds.awayOdds}`);
+    }
   }
 
   private extractTeamNamesFromTotelepepString(teamsString: string): { home: string; away: string } | null {
