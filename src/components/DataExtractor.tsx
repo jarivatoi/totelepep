@@ -186,6 +186,29 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
         </button>
 
         {extractionStatus && (
+          <div className={`flex items-center gap-2 p-3 rounded-lg ${
+            extractionStatus.includes('Failed') 
+              ? 'bg-red-50 text-red-700' 
+              : extractionStatus.includes('Successfully')
+              ? 'bg-green-50 text-green-700'
+              : 'bg-blue-50 text-blue-700'
+          }`}>
+            {extractionStatus.includes('Failed') ? (
+              <AlertCircle className="w-4 h-4" />
+            ) : extractionStatus.includes('Successfully') ? (
+              <CheckCircle className="w-4 h-4" />
+            ) : (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>
+            )}
+            <span className="text-sm font-medium">{extractionStatus}</span>
+            {extractedCount > 0 && (
+              <span className="ml-auto bg-white px-2 py-1 rounded text-xs font-bold">
+                {extractedCount} matches
+              </span>
+            )}
+          </div>
+        )}
+
       {debugData && (
         <div className="mt-6 space-y-4">
           <div className="flex items-center justify-between">
@@ -263,29 +286,6 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
           )}
         </div>
       )}
-
-          <div className={`flex items-center gap-2 p-3 rounded-lg ${
-            extractionStatus.includes('Failed') 
-              ? 'bg-red-50 text-red-700' 
-              : extractionStatus.includes('Successfully')
-              ? 'bg-green-50 text-green-700'
-              : 'bg-blue-50 text-blue-700'
-          }`}>
-            {extractionStatus.includes('Failed') ? (
-              <AlertCircle className="w-4 h-4" />
-            ) : extractionStatus.includes('Successfully') ? (
-              <CheckCircle className="w-4 h-4" />
-            ) : (
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>
-            )}
-            <span className="text-sm font-medium">{extractionStatus}</span>
-            {extractedCount > 0 && (
-              <span className="ml-auto bg-white px-2 py-1 rounded text-xs font-bold">
-                {extractedCount} matches
-              </span>
-            )}
-          </div>
-        )}
 
         <div className="text-xs text-gray-500 space-y-1">
           <p>• Extracts data from HTML tables and JavaScript</p>
