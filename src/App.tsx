@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Search, Calendar, AlertCircle, Calculator } from 'lucide-react';
+import { RefreshCw, Search, Calendar, AlertCircle, Calculator, Database } from 'lucide-react';
 import DateGroupedMatches from './components/DateGroupedMatches';
 import Header from './components/Header';
 import StatsCards from './components/StatsCards';
 import ParlayBuilder, { ParlaySelection } from './components/ParlayBuilder';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import DataExtractor from './components/DataExtractor';
 import { totelepepService, TotelepepMatch } from './services/totelepepService';
 import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
 import { usePWA } from './hooks/usePWA';
@@ -18,6 +19,7 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [parlaySelections, setParlaySelections] = useState<ParlaySelection[]>([]);
   const [showParlay, setShowParlay] = useState(false);
+  const [showExtractor, setShowExtractor] = useState(false);
   
   const { isOnline } = usePWA();
 
@@ -44,13 +46,9 @@ function App() {
       
       setLastUpdated(new Date());
       console.log(`✅ Loaded ${sortedMatches.length} matches from Totelepep`);
-      
-      if (sortedMatches.length === 0) {
-        setError('No matches found on Totelepep. The site may be down or have changed structure.');
-      }
     } catch (error) {
       console.error('Error loading data:', error);
-      setError(isOnline ? 'Failed to load data from Totelepep. The site may be temporarily unavailable.' : 'You are offline. Showing cached data if available.');
+      setError(isOnline ? 'Failed to load data from Totelepep. Try the data extractor below.' : 'You are offline. Showing cached data if available.');
     } finally {
       setLoading(false);
     }
@@ -130,6 +128,26 @@ function App() {
     setParlaySelections([]);
     setShowParlay(false);
   };
+  const handleDataExtracted = (extractedData: any[]) => {
+    // Convert extracted data to TotelepepMatch format
+    const convertedMatches: TotelepepMatch[] = extractedData.map(match => ({
+      ...match,
+      // Ensure all required fields are present
+      overUnder: match.overUnder || { over: 1.85, under: 1.85, line: 2.5 },
+      bothTeamsScore: match.bothTeamsScore || { yes: 1.70, no: 2.10 }
+    }));
+
+    setMatches(convertedMatches);
+    
+    // Group matches by date
+    const grouped = totelepepService.groupMatchesByDate(convertedMatches);
+    setGroupedMatches(grouped);
+    
+    setLastUpdated(new Date());
+    setError(null);
+    setShowExtractor(false);
+  };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -142,6 +160,15 @@ function App() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">All Totelepep Matches - Global Coverage</h1>
+              <div className="flex items-center gap-4 mb-2">
+                <button
+                  onClick={() => setShowExtractor(!showExtractor)}
+                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  <Database className="w-4 h-4" />
+                  {showExtractor ? 'Hide' : 'Show'} Data Extractor
+                </button>
+              </div>
               <p className="text-gray-600">
                 Last updated: {lastUpdated.toLocaleTimeString()} • All leagues worldwide • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
               </p>
@@ -190,6 +217,10 @@ function App() {
           </div>
 
           <StatsCards matches={matches} />
+          
+          {showExtractor && (
+            <DataExtractor onDataExtracted={handleDataExtracted} />
+          )}
           
           {searchTerm && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
