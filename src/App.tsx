@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Search, Calendar, AlertCircle, Calculator, Database } from 'lucide-react';
+import { RefreshCw, Search, Calendar, AlertCircle, Calculator, Database, Lightbulb } from 'lucide-react';
 import { Target } from 'lucide-react';
 import DateGroupedMatches from './components/DateGroupedMatches';
 import DateSelector from './components/DateSelector';
