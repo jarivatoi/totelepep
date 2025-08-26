@@ -180,11 +180,46 @@ class MatchSpecificExtractor {
   }
 
   private extractBTTSOdds(market: any, oddsData: MatchOddsData): void {
-    // Implementation for BTTS odds extraction
+    if (market.selectionList && Array.isArray(market.selectionList)) {
+      market.selectionList.forEach((selection: any) => {
+        const selectionName = selection.name?.toLowerCase() || '';
+        const odds = parseFloat(selection.companyOdds);
+        
+        if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
+          if (selectionName === 'yes') {
+            oddsData.bttsYes = odds;
+            console.log(`   ✅ BTTS Yes extracted: ${odds}`);
+          } else if (selectionName === 'no') {
+            oddsData.bttsNo = odds;
+            console.log(`   ✅ BTTS No extracted: ${odds}`);
+          }
+        }
+      });
+    }
   }
 
   private extractOverUnderOdds(market: any, oddsData: MatchOddsData): void {
-    // Implementation for Over/Under odds extraction
+    const marketName = market.marketDisplayName?.toLowerCase() || '';
+    
+    // Look for 2.5 goals markets specifically
+    if (marketName.includes('2.5') || marketName.includes('+2.5')) {
+      if (market.selectionList && Array.isArray(market.selectionList)) {
+        market.selectionList.forEach((selection: any) => {
+          const selectionName = selection.name?.toLowerCase() || '';
+          const odds = parseFloat(selection.companyOdds);
+          
+          if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
+            if (selectionName === 'under') {
+              oddsData.under25 = odds;
+              console.log(`   ✅ Under 2.5 extracted: ${odds}`);
+            } else if (selectionName === 'over') {
+              oddsData.over25 = odds;
+              console.log(`   ✅ Over 2.5 extracted: ${odds}`);
+            }
+          }
+        });
+      }
+    }
   }
 
   private extractFromNameValueArray(array: any[], oddsData: MatchOddsData): void {
