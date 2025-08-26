@@ -119,22 +119,17 @@ class TotelepepExtractor {
       console.log('📊 Response type:', typeof jsonData);
       console.log('📊 Response keys:', Object.keys(jsonData || {}));
       
-      // Parse JSON structure like Power Query - look for matches array with markets
-      if (jsonData && Array.isArray(jsonData)) {
-        // Direct array of matches
-        const parsedMatches = this.parseMatchesWithMarkets(jsonData);
+      // Parse JSON structure (equivalent to Power Query Json.Document)
+      // Totelepep uses a special matchData field with pipe-delimited format
+      if (jsonData && jsonData.matchData && typeof jsonData.matchData === 'string') {
+        console.log(`📊 Found matchData string with ${jsonData.matchData.length} characters`);
+        console.log(`📄 Sample matchData: ${jsonData.matchData.substring(0, 200)}...`);
+        
+        // Parse the pipe-delimited match data
+        const parsedMatches = this.parseTotelepepMatchData(jsonData.matchData);
         matches.push(...parsedMatches);
-        console.log(`✅ Parsed ${parsedMatches.length} matches from direct array`);
-      } else if (jsonData && jsonData.matches && Array.isArray(jsonData.matches)) {
-        // Matches nested in matches property
-        const parsedMatches = this.parseMatchesWithMarkets(jsonData.matches);
-        matches.push(...parsedMatches);
-        console.log(`✅ Parsed ${parsedMatches.length} matches from matches array`);
-      } else if (jsonData && jsonData.data && Array.isArray(jsonData.data)) {
-        // Matches nested in data property
-        const parsedMatches = this.parseMatchesWithMarkets(jsonData.data);
-        matches.push(...parsedMatches);
-        console.log(`✅ Parsed ${parsedMatches.length} matches from data array`);
+        
+        console.log(`✅ Parsed ${parsedMatches.length} matches from matchData`);
       } else {
         console.warn('⚠️ Unexpected JSON structure. Available keys:', Object.keys(jsonData || {}));
         console.warn('⚠️ Sample of first few properties:', JSON.stringify(jsonData, null, 2).substring(0, 500));
@@ -151,15 +146,17 @@ class TotelepepExtractor {
     }
   }
 
-  private parseMatchesWithMarkets(matchesArray: any[]): TotelepepMatch[] {
+  private parseTotelepepMatchData(matchDataString: string): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
     try {
-      console.log(`🔍 Found ${matchesArray.length} matches in array`);
+      // Split by pipe separator to get individual matches
+      const matchEntries = matchDataString.split('|').filter(entry => entry.trim());
+      console.log(`🔍 Found ${matchEntries.length} match entries in matchData`);
       
-      for (let i = 0; i < matchesArray.length; i++) {
-        const matchData = matchesArray[i];
-        const match = this.parseMatchWithMarkets(matchData, i);
+      for (let i = 0; i < matchEntries.length; i++) {
+        const entry = matchEntries[i];
+        const match = this.parseTotelepepMatchEntry(entry, i);
         if (match) {
           matches.push(match);
           console.log(`✅ Parsed: ${match.homeTeam} vs ${match.awayTeam} (${match.homeOdds}/${match.drawOdds}/${match.awayOdds})`);
@@ -173,130 +170,69 @@ class TotelepepExtractor {
     return matches;
   }
 
-  private parseMatchWithMarkets(matchData: any, index: number): TotelepepMatch | null {
+  private parseTotelepepMatchEntry(entry: string, index: number): TotelepepMatch | null {
     try {
-      console.log(`🔍 Match ${index} data:`, JSON.stringify(matchData, null, 2));
+      // Split by semicolon to get match fields
+      const fields = entry.split(';');
       
-      // Extract basic match info
-      const matchId = matchData.id || matchData.matchId || matchData.eventId || `match-${index}`;
-      const homeTeam = matchData.homeTeam || matchData.home || matchData.team1 || matchData.homeTeamName;
-      const awayTeam = matchData.awayTeam || matchData.away || matchData.team2 || matchData.awayTeamName;
-      const league = matchData.league || matchData.competition || matchData.tournament || matchData.competitionName;
-      const kickoff = this.formatTime(matchData.time || matchData.kickoff || matchData.startTime);
-      const date = this.formatDate(matchData.date || matchData.matchDate);
-      
-      if (!homeTeam || !awayTeam) {
-        console.warn(`⚠️ Missing team names in match ${index}`);
+      if (fields.length < 10) {
+        console.warn(`⚠️ Entry ${index} has insufficient fields (${fields.length}): ${entry.substring(0, 100)}`);
         return null;
       }
       
-      // Extract odds from markets array (like Power Query)
-      const markets = matchData.markets || [];
-      console.log(`📊 Found ${markets.length} markets for ${homeTeam} vs ${awayTeam}`);
+      console.log(`🔍 Entry ${index} fields:`, fields.slice(0, 15)); // Show first 15 fields
       
-      // Extract 1X2 odds (marketDisplayName = "1 X 2 ")
-      const fullTimeMarket = markets.find((market: any) => 
-        market.marketDisplayName === "1 X 2 " || 
-        market.marketDisplayName === "1X2" ||
-        market.marketDisplayName === "Match Result"
-      );
+      // Parse Totelepep match entry format:
+      // 0: matchId, 1: competitionId, 2: teams, 3: datetime, 4: homeScore, 5: awayScore, 
+      // 6: homeTeamShort, 7: homeOdds, 8: "Draw", 9: drawOdds, 10: awayTeamShort, 11: awayOdds, ...
       
-      let homeOdds = this.generateRealisticOdds();
-      let drawOdds = this.generateRealisticOdds();
-      let awayOdds = this.generateRealisticOdds();
+      const matchId = fields[0];
+      const teamsString = fields[2]; // e.g., "Austria Lustenau v Kapfenberger SV"
+      const datetime = fields[3]; // e.g., "26 Aug 20:30"
+      const homeOdds = parseFloat(fields[7]);
+      const drawOdds = parseFloat(fields[9]);
+      const awayOdds = parseFloat(fields[11]);
       
-      if (fullTimeMarket && fullTimeMarket.selections) {
-        console.log(`🎯 Found 1X2 market with ${fullTimeMarket.selections.length} selections`);
-        fullTimeMarket.selections.forEach((selection: any) => {
-          const name = selection.selectionDisplayName || selection.name || '';
-          const odds = parseFloat(selection.odds || selection.price || 0);
-          
-          if (name === '1' || name.toLowerCase().includes('home') || name === homeTeam) {
-            homeOdds = odds;
-          } else if (name === 'X' || name.toLowerCase().includes('draw')) {
-            drawOdds = odds;
-          } else if (name === '2' || name.toLowerCase().includes('away') || name === awayTeam) {
-            awayOdds = odds;
-          }
-        });
+      // Extract team names from teams string
+      const teamNames = this.extractTeamNamesFromTotelepepString(teamsString);
+      if (!teamNames) {
+        console.warn(`⚠️ Could not extract team names from: ${teamsString}`);
+        return null;
       }
       
-      // Extract BTTS odds (Both Teams to Score)
-      const bttsMarket = markets.find((market: any) => 
-        market.marketDisplayName?.toLowerCase().includes('both teams to score') ||
-        market.marketDisplayName?.toLowerCase().includes('btts') ||
-        market.marketDisplayName === 'Both Teams To Score'
-      );
+      // Parse datetime
+      const { date, time } = this.parseTotelepepDateTime(datetime);
       
-      let bttsYes = this.generateRealisticOdds();
-      let bttsNo = this.generateRealisticOdds();
-      
-      if (bttsMarket && bttsMarket.selections) {
-        console.log(`🎯 Found BTTS market with ${bttsMarket.selections.length} selections`);
-        bttsMarket.selections.forEach((selection: any) => {
-          const name = selection.selectionDisplayName || selection.name || '';
-          const odds = parseFloat(selection.odds || selection.price || 0);
-          
-          if (name.toLowerCase().includes('yes') || name === 'Yes') {
-            bttsYes = odds;
-            console.log(`✅ BTTS Yes: ${odds}`);
-          } else if (name.toLowerCase().includes('no') || name === 'No') {
-            bttsNo = odds;
-            console.log(`✅ BTTS No: ${odds}`);
-          }
-        });
-      }
-      
-      // Extract Over/Under 2.5 odds
-      const ouMarket = markets.find((market: any) => 
-        market.marketDisplayName?.toLowerCase().includes('over/under') ||
-        market.marketDisplayName?.toLowerCase().includes('total goals') ||
-        market.marketDisplayName?.includes('2.5')
-      );
-      
-      let overOdds = this.generateRealisticOdds();
-      let underOdds = this.generateRealisticOdds();
-      
-      if (ouMarket && ouMarket.selections) {
-        console.log(`🎯 Found O/U market with ${ouMarket.selections.length} selections`);
-        ouMarket.selections.forEach((selection: any) => {
-          const name = selection.selectionDisplayName || selection.name || '';
-          const odds = parseFloat(selection.odds || selection.price || 0);
-          
-          if (name.toLowerCase().includes('over')) {
-            overOdds = odds;
-          } else if (name.toLowerCase().includes('under')) {
-            underOdds = odds;
-          }
-        });
-      }
+      // Get competition name from competitionData if available
+      const competitionId = fields[1];
+      const league = this.getLeagueFromCompetitionId(competitionId) || 'Football League';
       
       const match: TotelepepMatch = {
         id: matchId,
-        homeTeam,
-        awayTeam,
-        league: league || 'Football League',
-        kickoff,
+        homeTeam: teamNames.home,
+        awayTeam: teamNames.away,
+        league,
+        kickoff: time,
         date,
         status: 'upcoming' as const,
-        homeOdds,
-        drawOdds,
-        awayOdds,
+        homeOdds: isNaN(homeOdds) ? this.generateRealisticOdds() : homeOdds,
+        drawOdds: isNaN(drawOdds) ? this.generateRealisticOdds() : drawOdds,
+        awayOdds: isNaN(awayOdds) ? this.generateRealisticOdds() : awayOdds,
         overUnder: {
-          over: overOdds,
-          under: underOdds,
+          over: this.generateRealisticOdds(),
+          under: this.generateRealisticOdds(),
           line: 2.5,
         },
         bothTeamsScore: {
-          yes: bttsYes,
-          no: bttsNo,
+          yes: this.generateRealisticOdds(),
+          no: this.generateRealisticOdds(),
         },
       };
       
       return this.isValidMatch(match) ? match : null;
       
     } catch (error) {
-      console.warn(`⚠️ Error parsing match ${index}:`, error);
+      console.warn(`⚠️ Error parsing match entry ${index}:`, error, entry.substring(0, 100));
       return null;
     }
   }
