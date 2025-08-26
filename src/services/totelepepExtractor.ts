@@ -267,7 +267,6 @@ class TotelepepExtractor {
     fields.forEach((field, index) => {
       const trimmedField = field.trim();
       
-      const oddsMatch = trimmedField.match(/^\d{1,2}\.\d{1,2}$/) || trimmedField.match(/^\d{1,2}\.\d{1,3}$/);
       const oddsPatterns = [
         /^\d{1,3}\.\d{1,3}$/, // 1.50, 2.25
         /^\d{1,3}$/, // 150, 225 (to be converted)
