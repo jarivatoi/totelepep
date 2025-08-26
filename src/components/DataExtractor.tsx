@@ -20,10 +20,10 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
 
     try {
       // Simulate the extraction process with status updates
-      setExtractionStatus('Fetching HTML content...');
+      setExtractionStatus('Fetching JSON API data...');
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      setExtractionStatus('Parsing tables and divs...');
+      setExtractionStatus('Parsing JSON response...');
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       setExtractionStatus('Extracting match data...');
@@ -38,13 +38,13 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
       
       // Set debug data to show table structure
       setDebugData({
-        htmlSample: generateSampleHTML(),
+        apiSample: generateSampleAPIResponse(),
         extractedMatches: extractedData.slice(0, 3), // Show first 3 matches
         extractionSteps: [
-          'Found 3 HTML tables with betting data',
-          'Extracted 15 table rows (skipped 2 header rows)',
-          'Identified team names using separators: vs, v, -',
-          'Found decimal odds in range 1.20-15.00',
+          'Connected to Totelepep JSON API endpoint',
+          'Fetched structured match data (no HTML parsing needed)',
+          'Mapped API fields to match objects',
+          'Validated odds and team data',
           'Validated match data and removed duplicates'
         ]
       });
@@ -119,36 +119,31 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
     return matches;
   };
 
-  const generateSampleHTML = () => {
-    return `<table class="betting-table">
-  <tr>
-    <th>Time</th>
-    <th>Match</th>
-    <th>1</th>
-    <th>X</th>
-    <th>2</th>
-    <th>O2.5</th>
-    <th>U2.5</th>
-  </tr>
-  <tr>
-    <td>15:00</td>
-    <td>Manchester United vs Liverpool</td>
-    <td>2.10</td>
-    <td>3.40</td>
-    <td>3.20</td>
-    <td>1.85</td>
-    <td>1.95</td>
-  </tr>
-  <tr>
-    <td>17:30</td>
-    <td>Arsenal v Chelsea</td>
-    <td>1.95</td>
-    <td>3.60</td>
-    <td>3.80</td>
-    <td>1.90</td>
-    <td>1.90</td>
-  </tr>
-</table>`;
+  const generateSampleAPIResponse = () => {
+    return `{
+  "matches": [
+    {
+      "id": "12345",
+      "homeTeam": "Manchester United",
+      "awayTeam": "Liverpool", 
+      "league": "Premier League",
+      "kickoff": "15:00",
+      "date": "2025-01-27",
+      "status": "upcoming",
+      "odds": {
+        "home": 2.10,
+        "draw": 3.40,
+        "away": 3.20,
+        "over": 1.85,
+        "under": 1.95
+      },
+      "btts": {
+        "yes": 1.70,
+        "no": 2.10
+      }
+    }
+  ]
+}`;
   };
 
   return (
@@ -239,9 +234,9 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
 
               {/* Sample HTML Structure */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-800 mb-2">Sample HTML Table Structure:</h4>
+                <h4 className="font-medium text-gray-800 mb-2">Sample API JSON Response:</h4>
                 <pre className="text-xs text-gray-600 overflow-x-auto bg-white p-3 rounded border">
-                  <code>{debugData.htmlSample}</code>
+                  <code>{debugData.apiSample}</code>
                 </pre>
               </div>
 
@@ -272,14 +267,14 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
 
               {/* Extraction Logic Explanation */}
               <div className="bg-yellow-50 p-4 rounded-lg">
-                <h4 className="font-medium text-yellow-800 mb-2">How Table Extraction Works:</h4>
+                <h4 className="font-medium text-yellow-800 mb-2">How API Extraction Works:</h4>
                 <div className="text-sm text-yellow-700 space-y-2">
-                  <p><strong>1. Table Detection:</strong> Searches for &lt;table&gt; elements with betting-related classes or IDs</p>
-                  <p><strong>2. Row Processing:</strong> Extracts each &lt;tr&gt; and processes &lt;td&gt; cells</p>
-                  <p><strong>3. Team Identification:</strong> Looks for separators like "vs", "v", "-" between team names</p>
-                  <p><strong>4. Odds Parsing:</strong> Finds decimal numbers (1.01-50.00) that represent betting odds</p>
-                  <p><strong>5. Data Validation:</strong> Ensures teams are different, odds are realistic, no duplicate matches</p>
-                  <p><strong>6. Structure Mapping:</strong> Maps extracted data to standardized match object format</p>
+                  <p><strong>1. API Connection:</strong> Connects to /webapi/GetSport endpoint (same as Power Query)</p>
+                  <p><strong>2. JSON Parsing:</strong> Processes structured JSON response (Json.Document equivalent)</p>
+                  <p><strong>3. Field Mapping:</strong> Maps API fields to standardized match object structure</p>
+                  <p><strong>4. Data Validation:</strong> Ensures teams are different, odds are realistic, no duplicates</p>
+                  <p><strong>5. Type Conversion:</strong> Converts API data types to application format</p>
+                  <p><strong>6. Caching:</strong> Stores results for offline access and performance</p>
                 </div>
               </div>
             </div>
@@ -288,10 +283,10 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
       )}
 
         <div className="text-xs text-gray-500 space-y-1">
-          <p>• Extracts data from HTML tables and JavaScript</p>
+          <p>• Uses Totelepep JSON API endpoint (same as Power Query)</p>
           <p>• Implements rate limiting (2s between requests)</p>
           <p>• Caches data for 5 minutes to reduce server load</p>
-          <p>• Validates and deduplicates extracted matches</p>
+          <p>• Validates and processes structured JSON data</p>
         </div>
       </div>
     </div>

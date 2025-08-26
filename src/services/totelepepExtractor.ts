@@ -24,7 +24,7 @@ interface TotelepepMatch {
 }
 
 class TotelepepExtractor {
-  private baseUrl = '/api';
+  private baseUrl = '/api/webapi/GetSport';
   private cache: Map<string, { data: TotelepepMatch[]; timestamp: number }> = new Map();
   private cacheTimeout = 5 * 60 * 1000; // 5 minutes
   private rateLimitDelay = 2000; // 2 seconds between requests
@@ -42,21 +42,21 @@ class TotelepepExtractor {
       // Rate limiting
       await this.enforceRateLimit();
 
-      console.log('🔍 Fetching fresh data from Totelepep...');
+      console.log('🔍 Fetching fresh data from Totelepep API...');
       
-      // Fetch HTML from totelepep.mu
-      const html = await this.fetchTotelepepHTML();
+      // Fetch JSON from totelepep.mu API
+      const jsonData = await this.fetchTotelepepAPI();
       
-      // Extract matches using Power Query logic
-      const matches = this.parseHTMLForMatches(html);
+      // Parse JSON data (same as Power Query Json.Document)
+      const matches = this.parseJSONForMatches(jsonData);
       
       if (matches.length > 0) {
-        console.log(`✅ Found ${matches.length} matches from Totelepep`);
+        console.log(`✅ Found ${matches.length} matches from Totelepep API`);
         this.setCachedData(matches);
         return matches;
       }
 
-      console.warn('⚠️ No matches found from Totelepep');
+      console.warn('⚠️ No matches found from Totelepep API');
       return [];
       
     } catch (error) {
@@ -73,10 +73,16 @@ class TotelepepExtractor {
     }
   }
 
-  private async fetchTotelepepHTML(): Promise<string> {
+  private async fetchTotelepepAPI(): Promise<any> {
+    // Build API URL with current date (same as Power Query)
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const apiUrl = `${this.baseUrl}?sportId=soccer&date=${today}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`;
+    
+    console.log('🌐 API URL:', apiUrl);
+    
     const response = await fetch(this.baseUrl, {
       headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'en-US,en;q=0.5',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Cache-Control': 'no-cache',
@@ -88,29 +94,45 @@ class TotelepepExtractor {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
-    const html = await response.text();
-    console.log(`📄 Fetched ${html.length} characters from Totelepep`);
+    const jsonData = await response.json();
+    console.log(`📄 Fetched JSON data from Totelepep API:`, jsonData);
     
-    return html;
+    return jsonData;
   }
 
-  private parseHTMLForMatches(html: string): TotelepepMatch[] {
+  private parseJSONForMatches(jsonData: any): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
     try {
-      console.log('🔧 Parsing HTML for match data...');
+      console.log('🔧 Parsing JSON for match data...');
       
-      // Method 1: Extract from Totelepep-specific HTML tables
-      const tableMatches = this.extractFromTotelepepTables(html);
-      matches.push(...tableMatches);
-      
-      // Method 2: Extract from Totelepep match containers
-      const containerMatches = this.extractFromTotelepepContainers(html);
-      matches.push(...containerMatches);
-      
-      // Method 3: Extract from embedded JavaScript/JSON data
-      const jsMatches = this.extractFromTotelepepJavaScript(html);
-      matches.push(...jsMatches);
+      // Parse JSON structure (equivalent to Power Query Json.Document)
+      if (jsonData && jsonData.matches && Array.isArray(jsonData.matches)) {
+        console.log(`📊 Found ${jsonData.matches.length} matches in API response`);
+        
+        for (let i = 0; i < jsonData.matches.length; i++) {
+          const apiMatch = jsonData.matches[i];
+          const match = this.convertAPIMatchToTotelepepMatch(apiMatch, i);
+          if (match) {
+            matches.push(match);
+            console.log(`✅ Converted: ${match.homeTeam} vs ${match.awayTeam}`);
+          }
+        }
+      } else if (Array.isArray(jsonData)) {
+        // Handle case where root is array
+        console.log(`📊 Found ${jsonData.length} matches in API array`);
+        
+        for (let i = 0; i < jsonData.length; i++) {
+          const apiMatch = jsonData[i];
+          const match = this.convertAPIMatchToTotelepepMatch(apiMatch, i);
+          if (match) {
+            matches.push(match);
+            console.log(`✅ Converted: ${match.homeTeam} vs ${match.awayTeam}`);
+          }
+        }
+      } else {
+        console.warn('⚠️ Unexpected JSON structure:', jsonData);
+      }
       
       console.log(`🎯 Extracted ${matches.length} total matches`);
       
@@ -118,11 +140,54 @@ class TotelepepExtractor {
       return this.deduplicateAndValidate(matches);
       
     } catch (error) {
-      console.error('❌ Error parsing HTML:', error);
+      console.error('❌ Error parsing JSON:', error);
       return [];
     }
   }
 
+  private convertAPIMatchToTotelepepMatch(apiMatch: any, index: number): TotelepepMatch | null {
+    try {
+      // Map API fields to our TotelepepMatch structure
+      // This will depend on the actual API response structure
+      
+      const match: TotelepepMatch = {
+        id: apiMatch.id || apiMatch.matchId || `api-${index}`,
+        homeTeam: apiMatch.homeTeam || apiMatch.home || apiMatch.team1 || 'Home Team',
+        awayTeam: apiMatch.awayTeam || apiMatch.away || apiMatch.team2 || 'Away Team',
+        league: apiMatch.league || apiMatch.competition || apiMatch.tournament || 'Football League',
+        kickoff: this.formatTime(apiMatch.time || apiMatch.kickoff || apiMatch.startTime),
+        date: this.formatDate(apiMatch.date || apiMatch.matchDate || apiMatch.gameDate),
+        status: this.parseStatus(apiMatch.status || apiMatch.state || apiMatch.matchStatus) as 'upcoming' | 'live' | 'finished',
+        
+        // Extract odds from API response
+        homeOdds: this.parseOdds(apiMatch.homeOdds || apiMatch.odds?.home || apiMatch.odds?.['1']),
+        drawOdds: this.parseOdds(apiMatch.drawOdds || apiMatch.odds?.draw || apiMatch.odds?.['X']),
+        awayOdds: this.parseOdds(apiMatch.awayOdds || apiMatch.odds?.away || apiMatch.odds?.['2']),
+        
+        overUnder: {
+          over: this.parseOdds(apiMatch.overOdds || apiMatch.odds?.over || apiMatch.totals?.over),
+          under: this.parseOdds(apiMatch.underOdds || apiMatch.odds?.under || apiMatch.totals?.under),
+          line: apiMatch.line || apiMatch.totals?.line || 2.5,
+        },
+        
+        bothTeamsScore: {
+          yes: this.parseOdds(apiMatch.bttsYes || apiMatch.odds?.bttsYes || apiMatch.btts?.yes),
+          no: this.parseOdds(apiMatch.bttsNo || apiMatch.odds?.bttsNo || apiMatch.btts?.no),
+        },
+        
+        // Live match data
+        homeScore: apiMatch.homeScore || apiMatch.score?.home,
+        awayScore: apiMatch.awayScore || apiMatch.score?.away,
+        minute: apiMatch.minute || apiMatch.time?.minute,
+      };
+      
+      return this.isValidMatch(match) ? match : null;
+      
+    } catch (error) {
+      console.warn('⚠️ Error converting API match:', error, apiMatch);
+      return null;
+    }
+  }
   private extractFromTotelepepTables(html: string): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
