@@ -76,24 +76,58 @@ class MatchSpecificExtractor {
       console.log(`🔧 Parsing markets response for match ${matchId}...`);
       console.log(`📄 Response structure:`, JSON.stringify(data, null, 2));
 
+      // Find the match in the competitions array
+      let targetMatch = null;
+      if (data.competitions && Array.isArray(data.competitions)) {
+        for (const competition of data.competitions) {
+          if (competition.matches && Array.isArray(competition.matches)) {
+            targetMatch = competition.matches.find((match: any) => match.id.toString() === matchId);
+            if (targetMatch) break;
+          }
+        }
+      }
+
+      if (!targetMatch) {
+        console.warn(`⚠️ Match ${matchId} not found in response`);
+        return null;
+      }
+
+      // CRITICAL ANALYSIS: Market count vs actual markets
+      const expectedMarkets = targetMatch.marketCount || 0;
+      const actualMarkets = targetMatch.markets ? targetMatch.markets.length : 0;
+      const missingMarkets = expectedMarkets - actualMarkets;
+
+      console.log(`📊 MARKET ANALYSIS for match ${matchId}:`);
+      console.log(`   Expected markets: ${expectedMarkets}`);
+      console.log(`   Actual markets: ${actualMarkets}`);
+      console.log(`   Missing markets: ${missingMarkets}`);
+      
+      if (missingMarkets > 0) {
+        console.log(`🚨 MISSING ${missingMarkets} MARKETS! These likely contain BTTS/Over-Under odds`);
+      }
+
+      // Analyze available markets
+      if (targetMatch.markets && Array.isArray(targetMatch.markets)) {
+        console.log(`📋 Available markets:`);
+        targetMatch.markets.forEach((market: any, index: number) => {
+          console.log(`   ${index + 1}. ${market.marketDisplayName} (Code: ${market.marketCode}, Period: ${market.periodCode})`);
+        });
+
+        // Look for market codes that might indicate other market types
+        const marketCodes = targetMatch.markets.map((m: any) => m.marketCode);
+        const uniqueCodes = [...new Set(marketCodes)];
+        console.log(`📊 Market codes found: ${uniqueCodes.join(', ')}`);
+        
+        if (uniqueCodes.length === 1 && uniqueCodes[0] === 'CP') {
+          console.log(`⚠️ Only CP (1X2) markets found. Need to find parameters for other market types.`);
+        }
+      }
+
       const oddsData: MatchOddsData = { matchId };
 
-      // Handle different possible response structures
-      if (Array.isArray(data)) {
-        // Direct array of Name/Value pairs
-        this.extractFromNameValueArray(data, oddsData);
-      } else if (data.table && Array.isArray(data.table)) {
-        // Table structure with Name/Value pairs
-        this.extractFromNameValueArray(data.table, oddsData);
-      } else if (data.odds && Array.isArray(data.odds)) {
-        // Odds array structure
-        this.extractFromNameValueArray(data.odds, oddsData);
-      } else if (data.markets && Array.isArray(data.markets)) {
-        // Markets array structure
-        this.extractFromNameValueArray(data.markets, oddsData);
-      } else {
-        // Try to find Name/Value pairs in any nested structure
-        this.extractFromNestedStructure(data, oddsData);
+      // Parse the markets structure
+      if (targetMatch.markets && Array.isArray(targetMatch.markets)) {
+        this.parseMarketsArray(targetMatch.markets, oddsData);
       }
 
       // Log all found odds
@@ -111,6 +145,46 @@ class MatchSpecificExtractor {
       console.error(`❌ Error parsing match ${matchId} response:`, error);
       return null;
     }
+  }
+
+  private parseMarketsArray(markets: any[], oddsData: MatchOddsData): void {
+    console.log(`🔍 Processing ${markets.length} markets...`);
+
+    markets.forEach((market, index) => {
+      const marketCode = market.marketCode;
+      const marketName = market.marketDisplayName?.toLowerCase() || '';
+      const periodCode = market.periodCode;
+      
+      console.log(`   Market ${index + 1}: "${market.marketDisplayName}" (${marketCode}/${periodCode})`);
+      
+      // Look for BTTS markets
+      if (marketName.includes('both') || marketName.includes('score') || marketCode === 'BTTS') {
+        console.log(`   🎯 Found potential BTTS market: ${market.marketDisplayName}`);
+        this.extractBTTSOdds(market, oddsData);
+      }
+      
+      // Look for Over/Under markets
+      if (marketName.includes('total') || marketName.includes('over') || marketName.includes('under') || 
+          marketName.includes('goals') || marketCode === 'OU' || marketCode === 'TG') {
+        console.log(`   🎯 Found potential Over/Under market: ${market.marketDisplayName}`);
+        this.extractOverUnderOdds(market, oddsData);
+      }
+      
+      // Log all selections for analysis
+      if (market.selectionList && Array.isArray(market.selectionList)) {
+        market.selectionList.forEach((selection: any, selIndex: number) => {
+          console.log(`     Selection ${selIndex + 1}: ${selection.name} = ${selection.companyOdds}`);
+        });
+      }
+    });
+  }
+
+  private extractBTTSOdds(market: any, oddsData: MatchOddsData): void {
+    // Implementation for BTTS odds extraction
+  }
+
+  private extractOverUnderOdds(market: any, oddsData: MatchOddsData): void {
+    // Implementation for Over/Under odds extraction
   }
 
   private extractFromNameValueArray(array: any[], oddsData: MatchOddsData): void {
