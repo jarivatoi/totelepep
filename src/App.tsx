@@ -252,6 +252,17 @@ function App() {
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 {loading ? 'Loading...' : isOnline ? 'Reload Data' : 'Offline'}
               </button>
+              
+              <button
+                onClick={() => {
+                  console.log('🔍 Manual extraction triggered');
+                  loadData(selectedDate);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"
+              >
+                <Database className="w-4 h-4" />
+                Extract Matches
+              </button>
             </div>
           </div>
 
