@@ -9,6 +9,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import DataExtractor from './components/DataExtractor';
 import EndpointDiscovery from './components/EndpointDiscovery';
 import ResponseAnalyzer from './components/ResponseAnalyzer';
+import AlternativeSolutions from './components/AlternativeSolutions';
 import { totelepepService, TotelepepMatch } from './services/totelepepService';
 import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
 import { usePWA } from './hooks/usePWA';
@@ -25,6 +26,7 @@ function App() {
   const [showExtractor, setShowExtractor] = useState(false);
   const [showEndpointDiscovery, setShowEndpointDiscovery] = useState(false);
   const [showResponseAnalyzer, setShowResponseAnalyzer] = useState(false);
+  const [showAlternatives, setShowAlternatives] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   const { isOnline } = usePWA();
@@ -216,6 +218,13 @@ function App() {
                   <Database className="w-4 h-4" />
                   {showResponseAnalyzer ? 'Hide' : 'Show'} Response Analyzer
                 </button>
+                <button
+                  onClick={() => setShowAlternatives(!showAlternatives)}
+                  className="flex items-center gap-2 text-yellow-600 hover:text-yellow-800 text-sm font-medium"
+                >
+                  <Lightbulb className="w-4 h-4" />
+                  {showAlternatives ? 'Hide' : 'Show'} Alternative Solutions
+                </button>
               </div>
               <p className="text-gray-600">
                 Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
@@ -291,6 +300,10 @@ function App() {
           
           {showResponseAnalyzer && (
             <ResponseAnalyzer />
+          )}
+          
+          {showAlternatives && (
+            <AlternativeSolutions />
           )}
           
           {searchTerm && (
