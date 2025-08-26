@@ -30,10 +30,11 @@ class TotelepepExtractor {
   private rateLimitDelay = 2000; // 2 seconds between requests
   private lastRequestTime = 0;
 
-  async extractMatches(): Promise<TotelepepMatch[]> {
+  async extractMatches(targetDate?: string): Promise<TotelepepMatch[]> {
     try {
       // Check cache first
-      const cached = this.getCachedData();
+      const cacheKey = targetDate || 'default';
+      const cached = this.getCachedData(cacheKey);
       if (cached) {
         console.log('📦 Returning cached data');
         return cached;
@@ -45,21 +46,22 @@ class TotelepepExtractor {
       console.log('🔍 Fetching fresh data from Totelepep API...');
       
       // Fetch JSON from totelepep.mu API
-      const jsonData = await this.fetchTotelepepAPI();
+      const jsonData = await this.fetchTotelepepAPI(targetDate);
       
       // Parse JSON data (same as Power Query Json.Document)
       const matches = this.parseJSONForMatches(jsonData);
       
       // Ensure all matches have the correct date
+      const dateToUse = targetDate || this.getTodayDate();
       matches.forEach(match => {
-        if (!match.date || match.date === new Date().toISOString().split('T')[0]) {
-          match.date = this.getTodayDate();
+        if (!match.date || match.date === dateToUse) {
+          match.date = dateToUse;
         }
       });
       
       if (matches.length > 0) {
         console.log(`✅ Found ${matches.length} matches from Totelepep API`);
-        this.setCachedData(matches);
+        this.setCachedData(matches, cacheKey);
         return matches;
       }
 
@@ -70,7 +72,8 @@ class TotelepepExtractor {
       console.error('❌ Error extracting matches:', error);
       
       // Try to return cached data even if expired
-      const cached = this.getCachedData(true);
+      const cacheKey = targetDate || 'default';
+      const cached = this.getCachedData(cacheKey, true);
       if (cached) {
         console.log('📦 Returning expired cached data as fallback');
         return cached;
@@ -80,12 +83,12 @@ class TotelepepExtractor {
     }
   }
 
-  private async fetchTotelepepAPI(): Promise<any> {
+  private async fetchTotelepepAPI(targetDate?: string): Promise<any> {
     // Build API URL with current date (same as Power Query)
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    const apiUrl = `${this.baseUrl}?sportId=soccer&date=${today}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`;
+    const dateToFetch = targetDate || this.getTodayDate(); // YYYY-MM-DD format
+    const apiUrl = `${this.baseUrl}?sportId=soccer&date=${dateToFetch}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`;
     
-    console.log('🌐 API URL:', apiUrl);
+    console.log(`🌐 API URL for ${dateToFetch}:`, apiUrl);
     
     const response = await fetch(apiUrl, {
       headers: {
@@ -102,7 +105,7 @@ class TotelepepExtractor {
     }
     
     const jsonData = await response.json();
-    console.log(`📄 Fetched JSON data from Totelepep API:`, jsonData);
+    console.log(`📄 Fetched JSON data for ${dateToFetch}:`, jsonData);
     
     return jsonData;
   }
@@ -1019,8 +1022,8 @@ class TotelepepExtractor {
     this.lastRequestTime = Date.now();
   }
 
-  private getCachedData(ignoreExpiry = false): TotelepepMatch[] | null {
-    const cached = this.cache.get('matches');
+  private getCachedData(cacheKey: string, ignoreExpiry = false): TotelepepMatch[] | null {
+    const cached = this.cache.get(cacheKey);
     if (!cached) return null;
     
     const isExpired = Date.now() - cached.timestamp > this.cacheTimeout;
@@ -1029,8 +1032,8 @@ class TotelepepExtractor {
     return cached.data;
   }
 
-  private setCachedData(matches: TotelepepMatch[]): void {
-    this.cache.set('matches', {
+  private setCachedData(matches: TotelepepMatch[], cacheKey: string): void {
+    this.cache.set(cacheKey, {
       data: matches,
       timestamp: Date.now()
     });

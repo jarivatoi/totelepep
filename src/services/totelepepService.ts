@@ -1,8 +1,8 @@
 import { totelepepExtractor, TotelepepMatch } from './totelepepExtractor';
 
 class TotelepepService {
-  async getMatches(): Promise<TotelepepMatch[]> {
-    return await totelepepExtractor.extractMatches();
+  async getMatches(targetDate?: string): Promise<TotelepepMatch[]> {
+    return await totelepepExtractor.extractMatches(targetDate);
   }
 
   sortMatchesByDate(matches: TotelepepMatch[]): TotelepepMatch[] {
