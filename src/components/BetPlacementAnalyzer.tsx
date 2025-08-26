@@ -289,7 +289,7 @@ const BetPlacementAnalyzer: React.FC = () => {
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <h3 className="font-semibold text-green-800 mb-2">🎯 Objective:</h3>
           <p className="text-green-700 text-sm">
-            Discover Totelepep's bet placement endpoints to get real ticket numbers when placing bets.
+            Discover Totelepep's pre-bet endpoints to get real booking numbers (no authentication required).
           </p>
         </div>
 
