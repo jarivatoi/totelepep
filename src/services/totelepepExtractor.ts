@@ -80,7 +80,7 @@ class TotelepepExtractor {
     
     console.log('🌐 API URL:', apiUrl);
     
-    const response = await fetch(this.baseUrl, {
+    const response = await fetch(apiUrl, {
       headers: {
         'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'en-US,en;q=0.5',
