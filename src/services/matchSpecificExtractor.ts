@@ -150,12 +150,28 @@ class MatchSpecificExtractor {
   private parseMarketsArray(markets: any[], oddsData: MatchOddsData): void {
     console.log(`🔍 Processing ${markets.length} markets...`);
 
+    // Power Query equivalent: List.Transform([markets], each if [marketDisplayName] = "Both Team To Score " then [marketBookNo] else "")
+    const bttsBookNumbers: string[] = [];
+    const ouBookNumbers: string[] = [];
+    
     markets.forEach((market, index) => {
       const marketCode = market.marketCode;
       const marketName = market.marketDisplayName?.toLowerCase() || '';
       const periodCode = market.periodCode;
       
       console.log(`   Market ${index + 1}: "${market.marketDisplayName}" (${marketCode}/${periodCode})`);
+      
+      // Power Query logic: Extract BookNo for BTTS markets
+      if (market.marketDisplayName === "Both Team To Score ") {
+        bttsBookNumbers.push(market.marketBookNo.toString());
+        console.log(`   📋 BTTS BookNo collected: ${market.marketBookNo}`);
+      }
+      
+      // Extract BookNo for Over/Under 2.5 markets
+      if (marketName.includes('under over +2.5')) {
+        ouBookNumbers.push(market.marketBookNo.toString());
+        console.log(`   📋 O/U 2.5 BookNo collected: ${market.marketBookNo}`);
+      }
       
       // Look for BTTS markets
       if (marketName.includes('both') || marketName.includes('score') || marketCode === 'BTTS') {
@@ -177,19 +193,43 @@ class MatchSpecificExtractor {
         });
       }
     });
+    
+    // Power Query equivalent: Text.Combine(List.Transform(_, Text.From))
+    const combinedBTTSBookNos = bttsBookNumbers.join(',');
+    const combinedOUBookNos = ouBookNumbers.join(',');
+    
+    console.log(`📋 Power Query BTTS BookNos: "${combinedBTTSBookNos}"`);
+    console.log(`📋 Power Query O/U BookNos: "${combinedOUBookNos}"`);
+    
+    // Store Power Query compatible data
+    if (!oddsData.additionalOdds) {
+      oddsData.additionalOdds = {};
+    }
+    oddsData.additionalOdds['BookNoBTTS'] = combinedBTTSBookNos;
+    oddsData.additionalOdds['BookNoOU'] = combinedOUBookNos;
   }
 
   private extractBTTSOdds(market: any, oddsData: MatchOddsData): void {
+    console.log(`   🎯 Processing BTTS market: "${market.marketDisplayName}" (Book: ${market.marketBookNo})`);
+    
+    // Store the market book number for Power Query compatibility
+    if (!oddsData.additionalOdds) {
+      oddsData.additionalOdds = {};
+    }
+    oddsData.additionalOdds[`BookNoBTTS_${market.marketBookNo}`] = market.marketBookNo;
+    
     if (market.selectionList && Array.isArray(market.selectionList)) {
       market.selectionList.forEach((selection: any) => {
         const selectionName = selection.name?.toLowerCase() || '';
         const odds = parseFloat(selection.companyOdds);
         
+        console.log(`     Selection: "${selection.name}" = ${selection.companyOdds} (${odds})`);
+        
         if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
-          if (selectionName === 'yes') {
+          if (selectionName === 'yes' || selectionName.includes('yes')) {
             oddsData.bttsYes = odds;
             console.log(`   ✅ BTTS Yes extracted: ${odds}`);
-          } else if (selectionName === 'no') {
+          } else if (selectionName === 'no' || selectionName.includes('no')) {
             oddsData.bttsNo = odds;
             console.log(`   ✅ BTTS No extracted: ${odds}`);
           }
@@ -200,25 +240,38 @@ class MatchSpecificExtractor {
 
   private extractOverUnderOdds(market: any, oddsData: MatchOddsData): void {
     const marketName = market.marketDisplayName?.toLowerCase() || '';
+    console.log(`   🎯 Processing O/U market: "${market.marketDisplayName}" (Book: ${market.marketBookNo})`);
+    
+    // Store the market book number for Power Query compatibility
+    if (!oddsData.additionalOdds) {
+      oddsData.additionalOdds = {};
+    }
+    oddsData.additionalOdds[`BookNoOU_${market.marketBookNo}`] = market.marketBookNo;
     
     // Look for 2.5 goals markets specifically
     if (marketName.includes('2.5') || marketName.includes('+2.5')) {
+      console.log(`     Found 2.5 goals market: "${market.marketDisplayName}"`);
+      
       if (market.selectionList && Array.isArray(market.selectionList)) {
         market.selectionList.forEach((selection: any) => {
           const selectionName = selection.name?.toLowerCase() || '';
           const odds = parseFloat(selection.companyOdds);
           
+          console.log(`     Selection: "${selection.name}" = ${selection.companyOdds} (${odds})`);
+          
           if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
-            if (selectionName === 'under') {
+            if (selectionName === 'under' || selectionName.includes('under')) {
               oddsData.under25 = odds;
               console.log(`   ✅ Under 2.5 extracted: ${odds}`);
-            } else if (selectionName === 'over') {
+            } else if (selectionName === 'over' || selectionName.includes('over')) {
               oddsData.over25 = odds;
               console.log(`   ✅ Over 2.5 extracted: ${odds}`);
             }
           }
         });
       }
+    } else {
+      console.log(`     Skipping non-2.5 market: "${market.marketDisplayName}"`);
     }
   }
 
