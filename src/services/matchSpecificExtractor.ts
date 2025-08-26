@@ -281,3 +281,5 @@ class MatchSpecificExtractor {
 
 export const matchSpecificExtractor = new MatchSpecificExtractor();
 export type { MatchOddsData };
+
+export { matchSpecificExtractor }
