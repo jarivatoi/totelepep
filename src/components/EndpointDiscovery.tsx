@@ -18,43 +18,68 @@ const EndpointDiscovery: React.FC = () => {
   const potentialEndpoints = [
     // Main sports API with different parameters
     `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
-    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all&odds=1`,
-    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all&extended=1`,
-    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all&full=1`,
     
-    // Odds-specific endpoints
-    `/api/webapi/GetOdds?sportId=soccer&date=${selectedDate}`,
-    `/api/webapi/GetMatchOdds?sportId=soccer&date=${selectedDate}`,
-    `/api/webapi/GetBettingOdds?sportId=soccer&date=${selectedDate}`,
-    `/api/webapi/GetFullOdds?sportId=soccer&date=${selectedDate}`,
+    // Try different periodCode values (might unlock more odds)
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=FT`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=HT`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=1H`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=2H`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=odds`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=markets`,
     
-    // Market-specific endpoints
-    `/api/webapi/GetMarkets?sportId=soccer&date=${selectedDate}`,
-    `/api/webapi/GetBTTS?sportId=soccer&date=${selectedDate}`,
-    `/api/webapi/GetOverUnder?sportId=soccer&date=${selectedDate}`,
-    `/api/webapi/GetTotals?sportId=soccer&date=${selectedDate}`,
+    // Try different pageNo values (might be pagination issue)
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=1&inclusive=1&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=500&inclusive=1&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=1000&inclusive=1&matchid=0&periodCode=all`,
     
-    // Different API versions
-    `/api/v1/GetSport?sportId=soccer&date=${selectedDate}`,
-    `/api/v2/GetSport?sportId=soccer&date=${selectedDate}`,
-    `/api/api/GetSport?sportId=soccer&date=${selectedDate}`,
+    // Try different inclusive values
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=0&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=2&matchid=0&periodCode=all`,
     
-    // Alternative paths
-    `/api/sports/soccer?date=${selectedDate}`,
-    `/api/matches/soccer?date=${selectedDate}`,
-    `/api/odds/soccer?date=${selectedDate}`,
-    `/api/betting/soccer?date=${selectedDate}`,
+    // Try specific match IDs (from your actual data)
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=227932&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=227369&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=227375&periodCode=all`,
     
-    // With match ID (we'll use a sample match ID)
-    `/api/webapi/GetMatchDetails?matchId=227700`,
-    `/api/webapi/GetMatchOdds?matchId=227700`,
-    `/api/webapi/GetFullMatch?matchId=227700`,
+    // Try different API paths that might exist
+    `/api/webapi/GetMatchData?sportId=soccer&date=${selectedDate}`,
+    `/api/webapi/GetFullData?sportId=soccer&date=${selectedDate}`,
+    `/api/webapi/GetExtendedData?sportId=soccer&date=${selectedDate}`,
+    `/api/webapi/GetCompleteData?sportId=soccer&date=${selectedDate}`,
+    `/api/webapi/GetAllOdds?sportId=soccer&date=${selectedDate}`,
+    `/api/webapi/GetDetailedOdds?sportId=soccer&date=${selectedDate}`,
     
-    // Different formats
-    `/api/webapi/GetSport?sportId=1&date=${selectedDate}`, // soccer might be ID 1
-    `/api/webapi/GetSport?sport=soccer&date=${selectedDate}`,
-    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&format=json`,
-    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&format=full`,
+    // Try different sport IDs
+    `/api/webapi/GetSport?sportId=1&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=football&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    
+    // Try different category values
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=odds&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=markets&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=betting&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=full&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    
+    // Try completely different endpoint names
+    `/api/webapi/GetBetting?sportId=soccer&date=${selectedDate}`,
+    `/api/webapi/GetOddsData?sportId=soccer&date=${selectedDate}`,
+    `/api/webapi/GetMarketData?sportId=soccer&date=${selectedDate}`,
+    `/api/webapi/GetPrices?sportId=soccer&date=${selectedDate}`,
+    
+    // Try with specific competition IDs (from your data: 81, 126, 50, etc.)
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=81&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=126&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=50&pageNo=200&inclusive=1&matchid=0&periodCode=all`,
+    
+    // Try potential mobile/app endpoints
+    `/api/mobile/GetSport?sportId=soccer&date=${selectedDate}`,
+    `/api/app/GetSport?sportId=soccer&date=${selectedDate}`,
+    `/api/json/GetSport?sportId=soccer&date=${selectedDate}`,
+    
+    // Try with additional parameters that might unlock more data
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all&detailed=1`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all&complete=1`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all&withOdds=1`,
+    `/api/webapi/GetSport?sportId=soccer&date=${selectedDate}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all&fullOdds=1`,
   ];
 
   const testEndpoint = async (url: string): Promise<EndpointResult> => {
