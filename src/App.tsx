@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Search, Calendar, AlertCircle, Calculator, Database, Lightbulb } from 'lucide-react';
-import { Target } from 'lucide-react';
+import { Target, Ticket } from 'lucide-react';
 import DateGroupedMatches from './components/DateGroupedMatches';
 import DateSelector from './components/DateSelector';
 import Header from './components/Header';
@@ -12,6 +12,7 @@ import EndpointDiscovery from './components/EndpointDiscovery';
 import ResponseAnalyzer from './components/ResponseAnalyzer';
 import AlternativeSolutions from './components/AlternativeSolutions';
 import MatchSpecificTester from './components/MatchSpecificTester';
+import BetPlacementAnalyzer from './components/BetPlacementAnalyzer';
 import { totelepepService, TotelepepMatch } from './services/totelepepService';
 import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
 import { usePWA } from './hooks/usePWA';
@@ -30,6 +31,7 @@ function App() {
   const [showResponseAnalyzer, setShowResponseAnalyzer] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [showMatchTester, setShowMatchTester] = useState(false);
+  const [showBetAnalyzer, setShowBetAnalyzer] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   const { isOnline } = usePWA();
@@ -235,6 +237,13 @@ function App() {
                   <Target className="w-4 h-4" />
                   {showMatchTester ? 'Hide' : 'Show'} Match-Specific Tester
                 </button>
+                <button
+                  onClick={() => setShowBetAnalyzer(!showBetAnalyzer)}
+                  className="flex items-center gap-2 text-orange-600 hover:text-orange-800 text-sm font-medium"
+                >
+                  <Ticket className="w-4 h-4" />
+                  {showBetAnalyzer ? 'Hide' : 'Show'} Bet Placement Analyzer
+                </button>
               </div>
               <p className="text-gray-600">
                 Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
@@ -322,6 +331,10 @@ function App() {
           
           {showMatchTester && (
             <MatchSpecificTester />
+          )}
+          
+          {showBetAnalyzer && (
+            <BetPlacementAnalyzer />
           )}
           
           {searchTerm && (
