@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Search, Calendar, AlertCircle, Calculator, Database } from 'lucide-react';
+import { Target } from 'lucide-react';
 import DateGroupedMatches from './components/DateGroupedMatches';
 import DateSelector from './components/DateSelector';
 import Header from './components/Header';
@@ -10,6 +11,7 @@ import DataExtractor from './components/DataExtractor';
 import EndpointDiscovery from './components/EndpointDiscovery';
 import ResponseAnalyzer from './components/ResponseAnalyzer';
 import AlternativeSolutions from './components/AlternativeSolutions';
+import MatchSpecificTester from './components/MatchSpecificTester';
 import { totelepepService, TotelepepMatch } from './services/totelepepService';
 import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
 import { usePWA } from './hooks/usePWA';
@@ -27,6 +29,7 @@ function App() {
   const [showEndpointDiscovery, setShowEndpointDiscovery] = useState(false);
   const [showResponseAnalyzer, setShowResponseAnalyzer] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [showMatchTester, setShowMatchTester] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   const { isOnline } = usePWA();
@@ -225,6 +228,13 @@ function App() {
                   <Lightbulb className="w-4 h-4" />
                   {showAlternatives ? 'Hide' : 'Show'} Alternative Solutions
                 </button>
+                <button
+                  onClick={() => setShowMatchTester(!showMatchTester)}
+                  className="flex items-center gap-2 text-green-600 hover:text-green-800 text-sm font-medium"
+                >
+                  <Target className="w-4 h-4" />
+                  {showMatchTester ? 'Hide' : 'Show'} Match-Specific Tester
+                </button>
               </div>
               <p className="text-gray-600">
                 Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
@@ -304,6 +314,10 @@ function App() {
           
           {showAlternatives && (
             <AlternativeSolutions />
+          )}
+          
+          {showMatchTester && (
+            <MatchSpecificTester />
           )}
           
           {searchTerm && (
