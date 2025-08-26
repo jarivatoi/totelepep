@@ -212,6 +212,12 @@ class MatchSpecificExtractor {
   private extractBTTSOdds(market: any, oddsData: MatchOddsData): void {
     console.log(`   🎯 Processing BTTS market: "${market.marketDisplayName}" (Book: ${market.marketBookNo})`);
     
+    // Only process the exact "Both Team To Score " market (with trailing space)
+    if (market.marketDisplayName !== "Both Team To Score ") {
+      console.log(`   ⚠️ Skipping non-BTTS market: "${market.marketDisplayName}"`);
+      return;
+    }
+    
     // Store the market book number for Power Query compatibility
     if (!oddsData.additionalOdds) {
       oddsData.additionalOdds = {};
@@ -226,10 +232,11 @@ class MatchSpecificExtractor {
         console.log(`     Selection: "${selection.name}" = ${selection.companyOdds} (${odds})`);
         
         if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
-          if (selectionName === 'yes' || selectionName.includes('yes')) {
+          // Use exact matching for BTTS selections
+          if (selection.name === 'YES') {
             oddsData.bttsYes = odds;
             console.log(`   ✅ BTTS Yes extracted: ${odds}`);
-          } else if (selectionName === 'no' || selectionName.includes('no')) {
+          } else if (selection.name === 'NO') {
             oddsData.bttsNo = odds;
             console.log(`   ✅ BTTS No extracted: ${odds}`);
           }
@@ -242,6 +249,12 @@ class MatchSpecificExtractor {
     const marketName = market.marketDisplayName?.toLowerCase() || '';
     console.log(`   🎯 Processing O/U market: "${market.marketDisplayName}" (Book: ${market.marketBookNo})`);
     
+    // Only process the exact "Under Over +2.5" market
+    if (!market.marketDisplayName?.includes('+2.5')) {
+      console.log(`     Skipping non-2.5 market: "${market.marketDisplayName}"`);
+      return;
+    }
+    
     // Store the market book number for Power Query compatibility
     if (!oddsData.additionalOdds) {
       oddsData.additionalOdds = {};
@@ -249,29 +262,25 @@ class MatchSpecificExtractor {
     oddsData.additionalOdds[`BookNoOU_${market.marketBookNo}`] = market.marketBookNo;
     
     // Look for 2.5 goals markets specifically
-    if (marketName.includes('2.5') || marketName.includes('+2.5')) {
-      console.log(`     Found 2.5 goals market: "${market.marketDisplayName}"`);
+    console.log(`     Found 2.5 goals market: "${market.marketDisplayName}"`);
       
-      if (market.selectionList && Array.isArray(market.selectionList)) {
-        market.selectionList.forEach((selection: any) => {
-          const selectionName = selection.name?.toLowerCase() || '';
-          const odds = parseFloat(selection.companyOdds);
-          
-          console.log(`     Selection: "${selection.name}" = ${selection.companyOdds} (${odds})`);
-          
-          if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
-            if (selectionName === 'under' || selectionName.includes('under')) {
-              oddsData.under25 = odds;
-              console.log(`   ✅ Under 2.5 extracted: ${odds}`);
-            } else if (selectionName === 'over' || selectionName.includes('over')) {
-              oddsData.over25 = odds;
-              console.log(`   ✅ Over 2.5 extracted: ${odds}`);
-            }
+    if (market.selectionList && Array.isArray(market.selectionList)) {
+      market.selectionList.forEach((selection: any) => {
+        const odds = parseFloat(selection.companyOdds);
+        
+        console.log(`     Selection: "${selection.name}" = ${selection.companyOdds} (${odds})`);
+        
+        if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
+          // Use exact matching for Over/Under selections
+          if (selection.name === 'Under') {
+            oddsData.under25 = odds;
+            console.log(`   ✅ Under 2.5 extracted: ${odds}`);
+          } else if (selection.name === 'Over') {
+            oddsData.over25 = odds;
+            console.log(`   ✅ Over 2.5 extracted: ${odds}`);
           }
-        });
-      }
-    } else {
-      console.log(`     Skipping non-2.5 market: "${market.marketDisplayName}"`);
+        }
+      });
     }
   }
 
