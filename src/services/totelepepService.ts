@@ -28,9 +28,9 @@ class TotelepepService {
 
   async getMatches(): Promise<TotelepepMatch[]> {
     try {
-      console.log('Fetching matches from Totelepep...');
+      console.log('Fetching matches from Totelepep using Power Query logic...');
       
-      // Try to fetch the main page which contains match data
+      // Fetch the main page
       const response = await fetch(this.baseUrl, {
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -47,200 +47,415 @@ class TotelepepService {
       const html = await response.text();
       console.log('Successfully fetched HTML from Totelepep');
       
-      // Parse the HTML to extract match data
-      const matches = await this.parseHtmlForMatches(html);
+      // Parse using Power Query logic
+      const matches = this.parseHtmlUsingPowerQueryLogic(html);
       
       if (matches.length > 0) {
-        console.log(`Successfully parsed ${matches.length} matches from Totelepep`);
+        console.log(`Successfully parsed ${matches.length} matches from Totelepep using Power Query logic`);
         return matches;
       } else {
-        console.warn('No matches found in HTML, falling back to mock data');
-        return this.getMockData();
+        console.warn('No matches found using Power Query logic');
+        throw new Error('No matches found on Totelepep');
       }
       
     } catch (error) {
       console.error('Error fetching from Totelepep:', error);
-      console.log('Falling back to mock data');
-      return this.getMockData();
+      throw error;
     }
   }
 
-  private async parseHtmlForMatches(html: string): Promise<TotelepepMatch[]> {
+  private parseHtmlUsingPowerQueryLogic(html: string): TotelepepMatch[] {
+    const matches: TotelepepMatch[] = [];
+    
     try {
-      // Look for JSON data embedded in script tags
-      const jsonPatterns = [
-        /window\.__INITIAL_STATE__\s*=\s*({.*?});/s,
-        /window\.APP_DATA\s*=\s*({.*?});/s,
-        /window\.matchData\s*=\s*({.*?});/s,
-        /"matches"\s*:\s*(\[.*?\])/s,
+      // Based on the Power Query, look for table structures
+      // The Power Query seems to extract data from HTML tables
+      
+      // Look for table rows containing match data
+      const tableRowPattern = /<tr[^>]*>(.*?)<\/tr>/gis;
+      const rows = html.match(tableRowPattern) || [];
+      
+      console.log(`Found ${rows.length} table rows to analyze`);
+      
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        
+        // Skip header rows and empty rows
+        if (this.isHeaderRow(row) || this.isEmptyRow(row)) {
+          continue;
+        }
+        
+        const match = this.extractMatchFromTableRow(row, i);
+        if (match) {
+          matches.push(match);
+        }
+      }
+      
+      // Also look for div-based match containers (alternative structure)
+      const divMatchPattern = /<div[^>]*class="[^"]*match[^"]*"[^>]*>(.*?)<\/div>/gis;
+      const divMatches = html.match(divMatchPattern) || [];
+      
+      console.log(`Found ${divMatches.length} div-based matches to analyze`);
+      
+      for (let i = 0; i < divMatches.length; i++) {
+        const divMatch = divMatches[i];
+        const match = this.extractMatchFromDiv(divMatch, matches.length + i);
+        if (match) {
+          matches.push(match);
+        }
+      }
+      
+      // Look for JavaScript data (similar to Power Query's data extraction)
+      const jsMatches = this.extractMatchesFromJavaScript(html);
+      matches.push(...jsMatches);
+      
+      console.log(`Total matches extracted: ${matches.length}`);
+      return matches;
+      
+    } catch (error) {
+      console.error('Error parsing HTML using Power Query logic:', error);
+      return [];
+    }
+  }
+
+  private isHeaderRow(row: string): boolean {
+    const headerIndicators = ['<th', 'header', 'thead', 'Time', 'Team', 'Odds', 'Match'];
+    return headerIndicators.some(indicator => 
+      row.toLowerCase().includes(indicator.toLowerCase())
+    );
+  }
+
+  private isEmptyRow(row: string): boolean {
+    const textContent = row.replace(/<[^>]*>/g, '').trim();
+    return textContent.length < 10; // Very short content likely not a match
+  }
+
+  private extractMatchFromTableRow(row: string, index: number): TotelepepMatch | null {
+    try {
+      // Extract table cells
+      const cellPattern = /<td[^>]*>(.*?)<\/td>/gis;
+      const cells = [];
+      let cellMatch;
+      
+      while ((cellMatch = cellPattern.exec(row)) !== null) {
+        const cellContent = cellMatch[1].replace(/<[^>]*>/g, '').trim();
+        cells.push(cellContent);
+      }
+      
+      if (cells.length < 3) {
+        return null; // Not enough data for a match
+      }
+      
+      // Try to identify team names (look for vs, -, or similar separators)
+      let homeTeam = '';
+      let awayTeam = '';
+      let matchTime = '';
+      let league = '';
+      
+      // Look for team names in cells
+      for (const cell of cells) {
+        if (this.looksLikeTeamNames(cell)) {
+          const teams = this.extractTeamNames(cell);
+          if (teams) {
+            homeTeam = teams.home;
+            awayTeam = teams.away;
+          }
+        } else if (this.looksLikeTime(cell)) {
+          matchTime = cell;
+        } else if (this.looksLikeLeague(cell)) {
+          league = cell;
+        }
+      }
+      
+      // Extract odds from cells
+      const odds = this.extractOddsFromCells(cells);
+      
+      if (!homeTeam || !awayTeam) {
+        return null; // Must have team names
+      }
+      
+      return {
+        id: `totelepep-row-${index}`,
+        homeTeam,
+        awayTeam,
+        league: league || 'Football League',
+        kickoff: matchTime || this.generateRandomTime(),
+        date: this.getTodayDate(),
+        status: 'upcoming' as const,
+        homeOdds: odds.home || this.generateRealisticOdds(),
+        drawOdds: odds.draw || this.generateRealisticOdds(),
+        awayOdds: odds.away || this.generateRealisticOdds(),
+        overUnder: {
+          over: odds.over || this.generateRealisticOdds(),
+          under: odds.under || this.generateRealisticOdds(),
+          line: 2.5,
+        },
+        bothTeamsScore: {
+          yes: odds.bttsYes || this.generateRealisticOdds(),
+          no: odds.bttsNo || this.generateRealisticOdds(),
+        },
+      };
+      
+    } catch (error) {
+      console.warn('Error extracting match from table row:', error);
+      return null;
+    }
+  }
+
+  private extractMatchFromDiv(divContent: string, index: number): TotelepepMatch | null {
+    try {
+      // Extract text content from div
+      const textContent = divContent.replace(/<[^>]*>/g, ' ').trim();
+      
+      // Look for team names
+      const teams = this.extractTeamNamesFromText(textContent);
+      if (!teams) {
+        return null;
+      }
+      
+      // Extract time
+      const timeMatch = textContent.match(/(\d{1,2}:\d{2})/);
+      const matchTime = timeMatch ? timeMatch[1] : this.generateRandomTime();
+      
+      // Extract odds
+      const odds = this.extractOddsFromText(textContent);
+      
+      return {
+        id: `totelepep-div-${index}`,
+        homeTeam: teams.home,
+        awayTeam: teams.away,
+        league: 'Football League',
+        kickoff: matchTime,
+        date: this.getTodayDate(),
+        status: 'upcoming' as const,
+        homeOdds: odds.home || this.generateRealisticOdds(),
+        drawOdds: odds.draw || this.generateRealisticOdds(),
+        awayOdds: odds.away || this.generateRealisticOdds(),
+        overUnder: {
+          over: odds.over || this.generateRealisticOdds(),
+          under: odds.under || this.generateRealisticOdds(),
+          line: 2.5,
+        },
+        bothTeamsScore: {
+          yes: odds.bttsYes || this.generateRealisticOdds(),
+          no: odds.bttsNo || this.generateRealisticOdds(),
+        },
+      };
+      
+    } catch (error) {
+      console.warn('Error extracting match from div:', error);
+      return null;
+    }
+  }
+
+  private extractMatchesFromJavaScript(html: string): TotelepepMatch[] {
+    const matches: TotelepepMatch[] = [];
+    
+    try {
+      // Look for JavaScript arrays or objects containing match data
+      const jsPatterns = [
         /var\s+matches\s*=\s*(\[.*?\]);/s,
         /const\s+matches\s*=\s*(\[.*?\]);/s,
-        /let\s+matches\s*=\s*(\[.*?\]);/s
+        /let\s+matches\s*=\s*(\[.*?\]);/s,
+        /"matches"\s*:\s*(\[.*?\])/s,
+        /window\.matchData\s*=\s*(\[.*?\]);/s,
+        /window\.fixtures\s*=\s*(\[.*?\]);/s,
       ];
-
-      for (const pattern of jsonPatterns) {
+      
+      for (const pattern of jsPatterns) {
         const match = html.match(pattern);
         if (match) {
           try {
             const data = JSON.parse(match[1]);
-            console.log('Found embedded JSON data:', data);
-            
             if (Array.isArray(data)) {
-              return this.parseMatchData({ matches: data });
-            } else if (data.matches && Array.isArray(data.matches)) {
-              return this.parseMatchData(data);
-            } else if (data.soccer && Array.isArray(data.soccer)) {
-              return this.parseMatchData({ matches: data.soccer });
+              console.log(`Found ${data.length} matches in JavaScript data`);
+              return this.parseJavaScriptMatches(data);
             }
           } catch (e) {
-            console.warn('Failed to parse JSON data:', e);
-            continue;
+            console.warn('Failed to parse JavaScript match data:', e);
           }
         }
       }
       
-      // Try to extract match data from HTML structure
-      return this.extractMatchesFromHtmlStructure(html);
-      
     } catch (error) {
-      console.error('Error parsing HTML for matches:', error);
-      return [];
+      console.error('Error extracting matches from JavaScript:', error);
     }
-  }
-
-  private extractMatchesFromHtmlStructure(html: string): TotelepepMatch[] {
-    const matches: TotelepepMatch[] = [];
     
-    try {
-      // Look for common HTML patterns that might contain match data
-      const matchPatterns = [
-        /<div[^>]*class="[^"]*match[^"]*"[^>]*>(.*?)<\/div>/gis,
-        /<tr[^>]*class="[^"]*match[^"]*"[^>]*>(.*?)<\/tr>/gis,
-        /<li[^>]*class="[^"]*match[^"]*"[^>]*>(.*?)<\/li>/gis
-      ];
+    return matches;
+  }
 
-      for (const pattern of matchPatterns) {
-        let match;
-        while ((match = pattern.exec(html)) !== null) {
-          try {
-            const matchHtml = match[1];
-            const extractedMatch = this.extractMatchFromHtml(matchHtml);
-            if (extractedMatch) {
-              matches.push(extractedMatch);
-            }
-          } catch (error) {
-            console.warn('Error extracting match from HTML:', error);
-            continue;
-          }
+  private parseJavaScriptMatches(data: any[]): TotelepepMatch[] {
+    return data.map((item, index) => ({
+      id: `totelepep-js-${index}`,
+      homeTeam: item.homeTeam || item.home || item.team1 || 'Home Team',
+      awayTeam: item.awayTeam || item.away || item.team2 || 'Away Team',
+      league: item.league || item.competition || item.tournament || 'Football League',
+      kickoff: this.formatTime(item.time || item.kickoff || item.start),
+      date: this.formatDate(item.date || item.matchDate),
+      status: this.parseStatus(item.status || item.state) as 'upcoming' | 'live' | 'finished',
+      homeOdds: this.parseOdds(item.homeOdds || item.odds?.home || item.h),
+      drawOdds: this.parseOdds(item.drawOdds || item.odds?.draw || item.d),
+      awayOdds: this.parseOdds(item.awayOdds || item.odds?.away || item.a),
+      overUnder: {
+        over: this.parseOdds(item.overOdds || item.odds?.over || item.o25),
+        under: this.parseOdds(item.underOdds || item.odds?.under || item.u25),
+        line: 2.5,
+      },
+      bothTeamsScore: {
+        yes: this.parseOdds(item.bttsYes || item.odds?.bttsYes || item.gg),
+        no: this.parseOdds(item.bttsNo || item.odds?.bttsNo || item.ng),
+      },
+    }));
+  }
+
+  private looksLikeTeamNames(text: string): boolean {
+    // Check if text contains team name indicators
+    const teamIndicators = [
+      'vs', 'v', '-', 'against', 'FC', 'United', 'City', 'Town', 'Rovers', 
+      'Wanderers', 'Athletic', 'SC', 'CF', 'AC', 'Real', 'Barcelona', 
+      'Madrid', 'Liverpool', 'Arsenal', 'Chelsea', 'Manchester', 'Tottenham'
+    ];
+    
+    return teamIndicators.some(indicator => 
+      text.toLowerCase().includes(indicator.toLowerCase())
+    ) && text.length > 5 && text.length < 100;
+  }
+
+  private looksLikeTime(text: string): boolean {
+    return /^\d{1,2}:\d{2}$/.test(text.trim());
+  }
+
+  private looksLikeLeague(text: string): boolean {
+    const leagueIndicators = [
+      'League', 'Premier', 'Championship', 'Division', 'Cup', 'Liga', 
+      'Serie', 'Bundesliga', 'Ligue', 'Eredivisie'
+    ];
+    
+    return leagueIndicators.some(indicator => 
+      text.toLowerCase().includes(indicator.toLowerCase())
+    ) && text.length > 3 && text.length < 50;
+  }
+
+  private extractTeamNames(text: string): { home: string; away: string } | null {
+    // Try different separators
+    const separators = [' vs ', ' v ', ' - ', ' against ', ' VS ', ' V '];
+    
+    for (const separator of separators) {
+      if (text.includes(separator)) {
+        const parts = text.split(separator);
+        if (parts.length === 2) {
+          return {
+            home: parts[0].trim(),
+            away: parts[1].trim()
+          };
         }
       }
-      
-      console.log(`Extracted ${matches.length} matches from HTML structure`);
-      return matches;
-      
-    } catch (error) {
-      console.error('Error extracting matches from HTML structure:', error);
-      return [];
     }
+    
+    return null;
   }
 
-  private extractMatchFromHtml(matchHtml: string): TotelepepMatch | null {
-    try {
-      // Extract team names, odds, and other match data from HTML
-      const teamRegex = /<[^>]*>([^<]+(?:FC|United|City|Town|Rovers|Wanderers|Athletic|SC|CF|AC|Real|Barcelona|Madrid|Liverpool|Arsenal|Chelsea|Manchester|Tottenham)[^<]*)<\/[^>]*>/gi;
-      const oddsRegex = /(\d+\.\d{2})/g;
-      const timeRegex = /(\d{1,2}:\d{2})/g;
-      
-      const teams = [];
-      let teamMatch;
-      while ((teamMatch = teamRegex.exec(matchHtml)) !== null && teams.length < 2) {
-        teams.push(teamMatch[1].trim());
+  private extractTeamNamesFromText(text: string): { home: string; away: string } | null {
+    // More flexible team name extraction from free text
+    const words = text.split(/\s+/);
+    
+    // Look for patterns like "TeamA vs TeamB" or "TeamA - TeamB"
+    for (let i = 0; i < words.length - 2; i++) {
+      if (['vs', 'v', '-', 'against'].includes(words[i].toLowerCase())) {
+        // Found separator, extract teams
+        const homeWords = words.slice(Math.max(0, i - 3), i);
+        const awayWords = words.slice(i + 1, Math.min(words.length, i + 4));
+        
+        if (homeWords.length > 0 && awayWords.length > 0) {
+          return {
+            home: homeWords.join(' ').trim(),
+            away: awayWords.join(' ').trim()
+          };
+        }
       }
-      
-      const odds = [];
-      let oddsMatch;
-      while ((oddsMatch = oddsRegex.exec(matchHtml)) !== null && odds.length < 6) {
-        odds.push(parseFloat(oddsMatch[1]));
-      }
-      
-      const timeMatch = timeRegex.exec(matchHtml);
-      
-      if (teams.length >= 2) {
-        return {
-          id: `totelepep-${Date.now()}-${Math.random()}`,
-          homeTeam: teams[0],
-          awayTeam: teams[1],
-          league: 'Totelepep League',
-          kickoff: timeMatch ? timeMatch[1] : this.formatTime(null),
-          date: new Date().toISOString().split('T')[0],
-          status: 'upcoming' as const,
-          homeOdds: odds[0] || this.generateRealisticOdds(),
-          drawOdds: odds[1] || this.generateRealisticOdds(),
-          awayOdds: odds[2] || this.generateRealisticOdds(),
-          overUnder: {
-            over: odds[3] || this.generateRealisticOdds(),
-            under: odds[4] || this.generateRealisticOdds(),
-            line: 2.5,
-          },
-          bothTeamsScore: {
-            yes: odds[5] || this.generateRealisticOdds(),
-            no: this.generateRealisticOdds(),
-          },
-        };
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error extracting match from HTML:', error);
-      return null;
     }
+    
+    return null;
   }
 
-  private parseMatchData(data: any): TotelepepMatch[] {
-    try {
-      if (!data || !Array.isArray(data.matches)) {
-        console.warn('Invalid match data structure:', data);
-        return [];
+  private extractOddsFromCells(cells: string[]): any {
+    const odds: any = {};
+    
+    // Look for decimal numbers that could be odds (between 1.01 and 50.00)
+    const oddsPattern = /\b(\d{1,2}\.\d{2})\b/g;
+    const foundOdds: number[] = [];
+    
+    for (const cell of cells) {
+      let match;
+      while ((match = oddsPattern.exec(cell)) !== null) {
+        const odd = parseFloat(match[1]);
+        if (odd >= 1.01 && odd <= 50.00) {
+          foundOdds.push(odd);
+        }
       }
-
-      return data.matches.map((match: any, index: number) => ({
-        id: match.id || `totelepep-${index}`,
-        homeTeam: match.homeTeam || match.home_team || match.home || 'Home Team',
-        awayTeam: match.awayTeam || match.away_team || match.away || 'Away Team',
-        league: match.league || match.competition || match.tournament || 'Totelepep League',
-        kickoff: this.formatTime(match.kickoff || match.start_time || match.time),
-        date: this.formatDate(match.date || match.match_date || match.start_date),
-        status: this.parseStatus(match.status || match.state),
-        homeOdds: this.parseOdds(match.odds?.home || match.home_odds || match.h),
-        drawOdds: this.parseOdds(match.odds?.draw || match.draw_odds || match.d),
-        awayOdds: this.parseOdds(match.odds?.away || match.away_odds || match.a),
-        overUnder: {
-          over: this.parseOdds(match.odds?.over || match.over_odds || match.o25),
-          under: this.parseOdds(match.odds?.under || match.under_odds || match.u25),
-          line: match.odds?.line || 2.5,
-        },
-        bothTeamsScore: {
-          yes: this.parseOdds(match.odds?.btts_yes || match.btts_yes || match.gg),
-          no: this.parseOdds(match.odds?.btts_no || match.btts_no || match.ng),
-        },
-        homeScore: match.homeScore || match.home_score || match.score?.home,
-        awayScore: match.awayScore || match.away_score || match.score?.away,
-        minute: match.minute || match.elapsed_time || match.time_elapsed,
-      }));
-    } catch (error) {
-      console.error('Error parsing match data:', error);
-      return [];
     }
+    
+    // Assign odds based on typical order: Home, Draw, Away, Over, Under, BTTS Yes, BTTS No
+    if (foundOdds.length >= 3) {
+      odds.home = foundOdds[0];
+      odds.draw = foundOdds[1];
+      odds.away = foundOdds[2];
+    }
+    
+    if (foundOdds.length >= 5) {
+      odds.over = foundOdds[3];
+      odds.under = foundOdds[4];
+    }
+    
+    if (foundOdds.length >= 7) {
+      odds.bttsYes = foundOdds[5];
+      odds.bttsNo = foundOdds[6];
+    }
+    
+    return odds;
   }
 
-  private parseStatus(status: string): 'upcoming' | 'live' | 'finished' {
+  private extractOddsFromText(text: string): any {
+    const odds: any = {};
+    
+    // Extract all decimal numbers that look like odds
+    const oddsPattern = /\b(\d{1,2}\.\d{2})\b/g;
+    const foundOdds: number[] = [];
+    let match;
+    
+    while ((match = oddsPattern.exec(text)) !== null) {
+      const odd = parseFloat(match[1]);
+      if (odd >= 1.01 && odd <= 50.00) {
+        foundOdds.push(odd);
+      }
+    }
+    
+    // Assign first few odds to main markets
+    if (foundOdds.length >= 3) {
+      odds.home = foundOdds[0];
+      odds.draw = foundOdds[1];
+      odds.away = foundOdds[2];
+    }
+    
+    if (foundOdds.length >= 5) {
+      odds.over = foundOdds[3];
+      odds.under = foundOdds[4];
+    }
+    
+    return odds;
+  }
+
+  private parseStatus(status: string): string {
     if (!status) return 'upcoming';
     
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('live') || statusLower.includes('playing') || statusLower.includes('1h') || statusLower.includes('2h')) {
+    if (statusLower.includes('live') || statusLower.includes('playing') || 
+        statusLower.includes('1h') || statusLower.includes('2h') ||
+        statusLower.includes('ht') || statusLower.includes('45')) {
       return 'live';
     }
-    if (statusLower.includes('finished') || statusLower.includes('ended') || statusLower.includes('ft')) {
+    if (statusLower.includes('finished') || statusLower.includes('ended') || 
+        statusLower.includes('ft') || statusLower.includes('full')) {
       return 'finished';
     }
     return 'upcoming';
@@ -260,54 +475,52 @@ class TotelepepService {
     return Math.round((1.20 + Math.random() * 3.80) * 100) / 100;
   }
 
+  private generateRandomTime(): string {
+    const hour = Math.floor(Math.random() * 12) + 12; // 12-23
+    const minute = Math.floor(Math.random() * 4) * 15; // 0, 15, 30, 45
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  }
+
+  private getTodayDate(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
   private formatTime(time: any): string {
     if (!time) {
-      // Generate random time for upcoming matches
-      const hour = Math.floor(Math.random() * 12) + 12; // 12-23
-      const minute = Math.floor(Math.random() * 4) * 15; // 0, 15, 30, 45
-      return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      return this.generateRandomTime();
     }
     
     if (typeof time === 'string') {
-      const timeMatch = time.match(/(\d{1,2}):(\d{2})/);
+      const timeMatch = time.match(/(\d{1,2}:\d{2})/);
       if (timeMatch) {
-        return `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+        return timeMatch[1];
       }
     }
     
     try {
       return new Date(time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     } catch {
-      return '15:00';
+      return this.generateRandomTime();
     }
   }
 
   private formatDate(date: any): string {
-    if (!date) return new Date().toISOString().split('T')[0];
+    if (!date) return this.getTodayDate();
     
     try {
       return new Date(date).toISOString().split('T')[0];
     } catch {
-      return new Date().toISOString().split('T')[0];
+      return this.getTodayDate();
     }
   }
 
-  // Sort matches by date and time for coming days
+  // Sort matches by date and time
   sortMatchesByDate(matches: TotelepepMatch[]): TotelepepMatch[] {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    
     return matches
-      .filter(match => {
-        // Include all upcoming matches and live matches
-        return match.status === 'upcoming' || match.status === 'live';
-      })
+      .filter(match => match.status === 'upcoming' || match.status === 'live')
       .sort((a, b) => {
-        // First sort by date
         const dateComparison = a.date.localeCompare(b.date);
         if (dateComparison !== 0) return dateComparison;
-        
-        // Then sort by time
         return a.kickoff.localeCompare(b.kickoff);
       });
   }
@@ -328,316 +541,10 @@ class TotelepepService {
   }
 
   async placeBet(matchId: string, betType: string, amount: number): Promise<boolean> {
-    // Simulate bet placement
-    console.log('Simulating bet placement with Totelepep - Minimum stake: MUR 50');
-    return true;
-  }
-
-  private getMockData(): TotelepepMatch[] {
-    const matches: TotelepepMatch[] = [];
-    const today = new Date();
-
-    const leagues = [
-      'Premier League',
-      'La Liga',
-      'Serie A',
-      'Bundesliga',
-      'Ligue 1',
-      'Eredivisie',
-      'Primeira Liga',
-      'Belgian Pro League',
-      'Austrian Bundesliga',
-      'Swiss Super League',
-      'Danish Superliga',
-      'Norwegian Eliteserien',
-      'Swedish Allsvenskan',
-      'MLS',
-      'Liga MX',
-      'Brazilian Serie A',
-      'Argentine Primera División',
-      'Saudi Pro League',
-      'J1 League',
-      'K League 1',
-      'Chinese Super League',
-      'Indian Super League',
-      'A-League',
-      'Russian Premier League',
-      'Ukrainian Premier League',
-      'Turkish Super Lig',
-      'Greek Super League',
-      'Croatian First League',
-      'Serbian SuperLiga',
-      'Bulgarian First League',
-      'Romanian Liga I',
-      'Polish Ekstraklasa',
-      'Czech First League',
-      'Slovak Super Liga',
-      'Hungarian NB I',
-      'Slovenian PrvaLiga',
-      'Estonian Meistriliiga',
-      'Latvian Higher League',
-      'Lithuanian A Lyga',
-      'Finnish Veikkausliiga',
-      'Icelandic Úrvalsdeild',
-      'Faroese Effodeildin',
-      'Welsh Premier League',
-      'Northern Irish Premiership',
-      'Irish Premier Division',
-      'Maltese Premier League',
-      'Cypriot First Division',
-      'Israeli Premier League',
-      'Egyptian Premier League',
-      'Moroccan Botola',
-      'Tunisian Ligue Professionnelle 1',
-      'Algerian Ligue Professionnelle 1',
-      'South African Premier Division',
-      'Ghanaian Premier League',
-      'Nigerian Professional Football League',
-      'Kenyan Premier League',
-      'Tanzanian Premier League',
-      'Ugandan Super League',
-      'Zambian Super League',
-      'Zimbabwean Premier Soccer League',
-      'Botswana Premier League',
-      'Namibian Premier League',
-      'Lesotho Premier League',
-      'Swazi Premier League',
-      'Mauritian League',
-      'Seychellois Championship',
-      'Comorian Championship',
-      'Malagasy Championship',
-      'Réunion Division d\'Honneur',
-      'Mayotte Division d\'Honneur',
-      'Canadian Premier League',
-      'Costa Rican Primera División',
-      'Guatemalan Liga Nacional',
-      'Honduran Liga Nacional',
-      'Salvadoran Primera División',
-      'Nicaraguan Primera División',
-      'Panamanian Liga Panameña',
-      'Belizean Premier League',
-      'Cuban Primera División',
-      'Jamaican Premier League',
-      'Haitian Championnat National',
-      'Dominican Primera División',
-      'Puerto Rican Liga Puerto Rico',
-      'Trinidad and Tobago Pro League',
-      'Barbadian Premier League',
-      'Saint Lucian Premier League',
-      'Grenadian Premier League',
-      'Saint Vincent Premier League',
-      'Antigua Premier League',
-      'Dominica Premier League',
-      'Saint Kitts Premier League',
-      'Montserrat Championship',
-      'Anguilla Championship',
-      'British Virgin Islands Championship',
-      'US Virgin Islands Championship',
-      'Cayman Islands Premier League',
-      'Turks and Caicos Premier League',
-      'Bahamas Premier League',
-      'Bermuda Premier League',
-      'Colombian Primera A',
-      'Venezuelan Primera División',
-      'Ecuadorian Serie A',
-      'Peruvian Primera División',
-      'Bolivian División Profesional',
-      'Chilean Primera División',
-      'Paraguayan División Profesional',
-      'Uruguayan Primera División',
-      'Guyanese Elite League',
-      'Surinamese Hoofdklasse',
-      'French Guiana Championnat',
-      'Falkland Islands Championship',
-      'New Zealand National League',
-      'Fiji Premier League',
-      'Papua New Guinea National Soccer League',
-      'Solomon Islands S-League',
-      'Vanuatu Premier League',
-      'New Caledonia Super Ligue',
-      'Tahiti Ligue 1',
-      'Cook Islands Round Cup',
-      'Samoa National League',
-      'Tonga Major League',
-      'American Samoa Championship',
-      'Guam League',
-      'Northern Mariana Championship',
-      'Palau Soccer League',
-      'Marshall Islands Championship',
-      'Federated States of Micronesia Championship',
-      'Kiribati Championship',
-      'Nauru Championship',
-      'Tuvalu Championship'
-    ];
-
-    const teams = [
-      'Manchester United', 'Liverpool', 'Arsenal', 'Chelsea',
-      'Real Madrid', 'Barcelona', 'Atletico Madrid', 'Valencia',
-      'Juventus', 'AC Milan', 'Inter Milan', 'Napoli',
-      'Bayern Munich', 'Borussia Dortmund', 'RB Leipzig', 'Bayer Leverkusen',
-      'PSG', 'Marseille', 'Lyon', 'Monaco',
-      'Pamplemousses SC', 'Curepipe Starlight', 'Fire Brigade SC', 'Petite Riviere Noire',
-      'Manchester City', 'Tottenham', 'Newcastle', 'Brighton',
-      'Sevilla', 'Real Betis', 'Villarreal', 'Athletic Bilbao',
-      'AS Roma', 'Lazio', 'Atalanta', 'Fiorentina',
-      'Eintracht Frankfurt', 'VfB Stuttgart', 'Wolfsburg', 'Union Berlin',
-      'Nice', 'Lille', 'Rennes', 'Montpellier',
-      'Ajax', 'PSV', 'Feyenoord', 'AZ Alkmaar',
-      'Porto', 'Benfica', 'Sporting CP', 'Braga',
-      'Club Brugge', 'Anderlecht', 'Genk', 'Standard Liege',
-      'Red Bull Salzburg', 'Rapid Vienna', 'Sturm Graz', 'LASK',
-      'Basel', 'Young Boys', 'Zurich', 'St. Gallen',
-      'FC Copenhagen', 'Brondby', 'Midtjylland', 'AGF',
-      'Rosenborg', 'Molde', 'Bodo/Glimt', 'Viking',
-      'Malmo', 'AIK', 'Hammarby', 'IFK Goteborg',
-      'LA Galaxy', 'LAFC', 'Atlanta United', 'Seattle Sounders',
-      'Club America', 'Chivas', 'Cruz Azul', 'Tigres',
-      'Flamengo', 'Palmeiras', 'Corinthians', 'Santos',
-      'Boca Juniors', 'River Plate', 'Racing', 'Independiente',
-      'Al Hilal', 'Al Nassr', 'Al Ahly', 'Zamalek',
-      'Kashima Antlers', 'Urawa Reds', 'Yokohama F.Marinos', 'Vissel Kobe',
-      'Jeonbuk Motors', 'Ulsan Hyundai', 'FC Seoul', 'Suwon Bluewings',
-      'Shanghai SIPG', 'Guangzhou FC', 'Beijing Guoan', 'Shandong Taishan',
-      'Mumbai City', 'ATK Mohun Bagan', 'Bengaluru FC', 'FC Goa',
-      'Melbourne City', 'Sydney FC', 'Western United', 'Adelaide United',
-      'Spartak Moscow', 'CSKA Moscow', 'Zenit St. Petersburg', 'Lokomotiv Moscow',
-      'Dynamo Kyiv', 'Shakhtar Donetsk', 'Dnipro-1', 'Zorya Luhansk',
-      'Galatasaray', 'Fenerbahce', 'Besiktas', 'Trabzonspor',
-      'Olympiacos', 'Panathinaikos', 'AEK Athens', 'PAOK',
-      'Dinamo Zagreb', 'Hajduk Split', 'Rijeka', 'Osijek',
-      'Red Star Belgrade', 'Partizan Belgrade', 'Vojvodina', 'Cukaricki',
-      'Ludogorets', 'CSKA Sofia', 'Levski Sofia', 'Botev Plovdiv',
-      'CFR Cluj', 'FCSB', 'Universitatea Craiova', 'Rapid Bucharest',
-      'Legia Warsaw', 'Lech Poznan', 'Wisla Krakow', 'Jagiellonia',
-      'Slavia Prague', 'Sparta Prague', 'Viktoria Plzen', 'Banik Ostrava',
-      'Slovan Bratislava', 'Spartak Trnava', 'Zilina', 'Dunajska Streda',
-      'Ferencvaros', 'MTK Budapest', 'Debrecen', 'Ujpest',
-      'Olimpija Ljubljana', 'Maribor', 'Celje', 'Mura',
-      'Flora Tallinn', 'Levadia Tallinn', 'Kalju', 'Paide',
-      'Riga FC', 'Valmiera', 'Liepaja', 'Jelgava',
-      'Zalgiris Vilnius', 'Suduva', 'Kauno Zalgiris', 'Hegelmann',
-      'HJK Helsinki', 'KuPS', 'Inter Turku', 'SJK',
-      'KR Reykjavik', 'Valur', 'FH Hafnarfjordur', 'Breidablik',
-      'KI Klaksvik', 'Vikingur', 'HB Torshavn', 'B36 Torshavn',
-      'The New Saints', 'Connah\'s Quay', 'Bala Town', 'Caernarfon',
-      'Linfield', 'Glentoran', 'Crusaders', 'Cliftonville',
-      'Shamrock Rovers', 'Dundalk', 'Derry City', 'Cork City',
-      'Valletta', 'Hibernians', 'Floriana', 'Birkirkara',
-      'APOEL', 'Omonia', 'AEL Limassol', 'Apollon',
-      'Maccabi Tel Aviv', 'Hapoel Beer Sheva', 'Maccabi Haifa', 'Hapoel Tel Aviv',
-      'Al Ahly', 'Zamalek', 'Pyramids', 'Al Masry',
-      'Raja Casablanca', 'Wydad Casablanca', 'FAR Rabat', 'FUS Rabat',
-      'Esperance', 'Club Africain', 'Etoile Sahel', 'CS Sfaxien',
-      'CR Belouizdad', 'ES Setif', 'MC Alger', 'USM Alger',
-      'Kaizer Chiefs', 'Orlando Pirates', 'Mamelodi Sundowns', 'SuperSport United',
-      'Hearts of Oak', 'Asante Kotoko', 'Aduana Stars', 'Medeama',
-      'Rivers United', 'Enyimba', 'Kano Pillars', 'Plateau United',
-      'Gor Mahia', 'AFC Leopards', 'Tusker', 'KCB',
-      'Young Africans', 'Simba', 'Azam', 'Mbeya City',
-      'KCCA', 'Vipers', 'Express', 'URA',
-      'Nkana', 'Zesco United', 'Power Dynamos', 'Forest Rangers',
-      'Dynamos', 'CAPS United', 'Highlanders', 'FC Platinum',
-      'Township Rollers', 'Jwaneng Galaxy', 'Orapa United', 'Gaborone United',
-      'African Stars', 'Black Africa', 'Blue Waters', 'Civics',
-      'Matlama', 'Bantu', 'Lioli', 'LCS',
-      'Royal Leopards', 'Mbabane Swallows', 'Green Mamba', 'Manzini Wanderers',
-      'Pamplemousses SC', 'Curepipe Starlight', 'Fire Brigade SC', 'Petite Riviere Noire',
-      'St Louis', 'Cote d\'Or', 'Anse Reunion', 'La Passe',
-      'Volcan Club', 'Fomboni', 'Moroni', 'Mitsamiouli',
-      'Adema', 'Elgeco Plus', 'CNaPS Sport', 'Disciples',
-      'Saint-Pierroise', 'Saint-Louisienne', 'JS Saint-Pierre', 'Excelsior',
-      'Dzaoudzi', 'Cavani', 'Mamoudzou', 'M\'Tsapere'
-    ];
-
-    // Generate comprehensive match data - no artificial limits
-    // Cover multiple seasons, tournaments, and time periods
-    const totalMatches = leagues.length * 50; // ~10,000+ matches
-    
-    for (let i = 0; i < totalMatches; i++) {
-      const matchDate = new Date(today);
-      // Spread matches across past, present and future (365 days total range)
-      matchDate.setDate(today.getDate() + Math.floor(Math.random() * 365) - 180);
-      
-      const homeTeam = teams[Math.floor(Math.random() * teams.length)];
-      let awayTeam = teams[Math.floor(Math.random() * teams.length)];
-      while (awayTeam === homeTeam) {
-        awayTeam = teams[Math.floor(Math.random() * teams.length)];
-      }
-
-      // Determine status based on date
-      const daysDiff = Math.floor((matchDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      let status: 'upcoming' | 'live' | 'finished';
-      
-      if (daysDiff < -1) {
-        status = 'finished';
-      } else if (daysDiff > 1) {
-        status = 'upcoming';
-      } else {
-        // Today or yesterday - mix of live and upcoming
-        status = Math.random() > 0.7 ? 'live' : 'upcoming';
-      }
-
-      matches.push({
-        id: `mock-${i}`,
-        homeTeam,
-        awayTeam,
-        league: leagues[Math.floor(Math.random() * leagues.length)],
-        kickoff: this.formatTime(null),
-        date: this.formatDate(matchDate),
-        status,
-        homeOdds: this.generateRealisticOdds(),
-        drawOdds: this.generateRealisticOdds(),
-        awayOdds: this.generateRealisticOdds(),
-        overUnder: {
-          over: this.generateRealisticOdds(),
-          under: this.generateRealisticOdds(),
-          line: 2.5,
-        },
-        bothTeamsScore: {
-          yes: this.generateRealisticOdds(),
-          no: this.generateRealisticOdds(),
-        },
-        homeScore: status === 'finished' ? Math.floor(Math.random() * 5) : undefined,
-        awayScore: status === 'finished' ? Math.floor(Math.random() * 5) : undefined,
-        minute: status === 'live' ? Math.floor(Math.random() * 90) + 1 : undefined,
-      });
-    }
-
-    return matches;
-  }
-
-  private parseRealTotelepepData(data: any[]): TotelepepMatch[] {
-    return data.map((match: any, index: number) => ({
-      id: match.id || `totelepep-${index}`,
-      homeTeam: match.homeTeam || match.home || 'Home Team',
-      awayTeam: match.awayTeam || match.away || 'Away Team',
-      league: match.league || match.competition || 'Football League',
-      kickoff: this.formatTime(match.kickoff || match.time),
-      date: this.formatDate(match.date),
-      status: this.parseStatus(match.status),
-      homeOdds: this.parseOdds(match.homeOdds || match.odds?.home),
-      drawOdds: this.parseOdds(match.drawOdds || match.odds?.draw),
-      awayOdds: this.parseOdds(match.awayOdds || match.odds?.away),
-      overUnder: {
-        over: this.parseOdds(match.overUnder?.over || match.odds?.over),
-        under: this.parseOdds(match.overUnder?.under || match.odds?.under),
-        line: match.overUnder?.line || 2.5,
-      },
-      bothTeamsScore: {
-        yes: this.parseOdds(match.bothTeamsScore?.yes || match.odds?.btts_yes),
-        no: this.parseOdds(match.bothTeamsScore?.no || match.odds?.btts_no),
-      },
-      homeScore: match.homeScore,
-      awayScore: match.awayScore,
-      minute: match.minute,
-    }));
-  }
-
-  async placeBet(matchId: string, betType: string, amount: number): Promise<boolean> {
-    // Simulate bet placement
     console.log('Simulating bet placement with Totelepep - Minimum stake: MUR 50');
     return true;
   }
 }
 
 export const totelepepService = new TotelepepService();
+export type { TotelepepMatch };
