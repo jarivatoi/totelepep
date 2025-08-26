@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Search, Calendar, AlertCircle, Calculator, Database } from 'lucide-react';
 import DateGroupedMatches from './components/DateGroupedMatches';
+import DateSelector from './components/DateSelector';
 import Header from './components/Header';
 import StatsCards from './components/StatsCards';
 import ParlayBuilder, { ParlaySelection } from './components/ParlayBuilder';
@@ -20,6 +21,7 @@ function App() {
   const [parlaySelections, setParlaySelections] = useState<ParlaySelection[]>([]);
   const [showParlay, setShowParlay] = useState(false);
   const [showExtractor, setShowExtractor] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   const { isOnline } = usePWA();
 
@@ -29,12 +31,14 @@ function App() {
     requestNotificationPermission();
     scheduleBackgroundSync();
   }, []);
-  const loadData = async () => {
+  
+  const loadData = async (targetDate?: string) => {
     setLoading(true);
     setError(null);
+    const dateToFetch = targetDate || selectedDate;
     try {
       console.log('🔍 Fetching data from Totelepep...');
-      const fetchedMatches = await totelepepService.getMatches();
+      const fetchedMatches = await totelepepService.getMatches(dateToFetch);
       
       // Sort matches by date and time
       const sortedMatches = totelepepService.sortMatchesByDate(fetchedMatches);
@@ -45,7 +49,7 @@ function App() {
       setGroupedMatches(grouped);
       
       setLastUpdated(new Date());
-      console.log(`✅ Loaded ${sortedMatches.length} matches from Totelepep`);
+      console.log(`✅ Loaded ${sortedMatches.length} matches from Totelepep for ${dateToFetch}`);
     } catch (error) {
       console.error('Error loading data:', error);
       setError(isOnline ? 'Failed to load data from Totelepep. Try the data extractor below.' : 'You are offline. Showing cached data if available.');
@@ -54,17 +58,22 @@ function App() {
     }
   };
 
+  // Load data when selected date changes
   useEffect(() => {
-    loadData();
+    loadData(selectedDate);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadData(selectedDate);
     
     // Auto-reload every 5 minutes for live data (only when online)
     const interval = setInterval(() => {
       if (isOnline) {
-        loadData();
+        loadData(selectedDate);
       }
     }, 300000);
     return () => clearInterval(interval);
-  }, [isOnline]);
+  }, [isOnline, selectedDate]);
 
   // Filter matches and maintain grouping
   const filteredGroupedMatches = React.useMemo(() => {
@@ -154,6 +163,10 @@ function App() {
     setShowExtractor(false);
   };
 
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    // loadData will be called automatically by useEffect
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -162,10 +175,21 @@ function App() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1">
+            <DateSelector
+              selectedDate={selectedDate}
+              onDateChange={handleDateChange}
+            />
+            
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">All Totelepep Matches - Global Coverage</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Totelepep Matches - {new Date(selectedDate).toLocaleDateString('en-GB', { 
+                  weekday: 'long', 
+                  day: 'numeric', 
+                  month: 'long' 
+                })}
+              </h1>
               <div className="flex items-center gap-4 mb-2">
                 <button
                   onClick={() => setShowExtractor(!showExtractor)}
@@ -176,7 +200,7 @@ function App() {
                 </button>
               </div>
               <p className="text-gray-600">
-                Last updated: {lastUpdated.toLocaleTimeString()} • All leagues worldwide • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
+                Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
               </p>
               {error && (
                 <div className="flex items-center gap-2 mt-2 text-red-600">
@@ -208,7 +232,7 @@ function App() {
               </div>
               
               <button
-                onClick={loadData}
+                onClick={() => loadData(selectedDate)}
                 disabled={loading}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95 ${
                   isOnline 
