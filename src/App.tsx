@@ -7,6 +7,7 @@ import StatsCards from './components/StatsCards';
 import ParlayBuilder, { ParlaySelection } from './components/ParlayBuilder';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import DataExtractor from './components/DataExtractor';
+import EndpointDiscovery from './components/EndpointDiscovery';
 import { totelepepService, TotelepepMatch } from './services/totelepepService';
 import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
 import { usePWA } from './hooks/usePWA';
@@ -21,6 +22,7 @@ function App() {
   const [parlaySelections, setParlaySelections] = useState<ParlaySelection[]>([]);
   const [showParlay, setShowParlay] = useState(false);
   const [showExtractor, setShowExtractor] = useState(false);
+  const [showEndpointDiscovery, setShowEndpointDiscovery] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   const { isOnline } = usePWA();
@@ -198,6 +200,13 @@ function App() {
                   <Database className="w-4 h-4" />
                   {showExtractor ? 'Hide' : 'Show'} Data Extractor
                 </button>
+                <button
+                  onClick={() => setShowEndpointDiscovery(!showEndpointDiscovery)}
+                  className="flex items-center gap-2 text-purple-600 hover:text-purple-800 text-sm font-medium"
+                >
+                  <Search className="w-4 h-4" />
+                  {showEndpointDiscovery ? 'Hide' : 'Show'} Endpoint Discovery
+                </button>
               </div>
               <p className="text-gray-600">
                 Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
@@ -250,6 +259,10 @@ function App() {
           
           {showExtractor && (
             <DataExtractor onDataExtracted={handleDataExtracted} />
+          )}
+          
+          {showEndpointDiscovery && (
+            <EndpointDiscovery />
           )}
           
           {searchTerm && (
