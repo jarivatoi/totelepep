@@ -105,6 +105,9 @@ class TotelepepExtractor {
     
     try {
       console.log('🔧 Parsing JSON for match data...');
+      console.log('📄 Full API Response:', JSON.stringify(jsonData, null, 2));
+      console.log('📊 Response type:', typeof jsonData);
+      console.log('📊 Response keys:', Object.keys(jsonData || {}));
       
       // Parse JSON structure (equivalent to Power Query Json.Document)
       if (jsonData && jsonData.matches && Array.isArray(jsonData.matches)) {
@@ -112,6 +115,39 @@ class TotelepepExtractor {
         
         for (let i = 0; i < jsonData.matches.length; i++) {
           const apiMatch = jsonData.matches[i];
+          const match = this.convertAPIMatchToTotelepepMatch(apiMatch, i);
+          if (match) {
+            matches.push(match);
+            console.log(`✅ Converted: ${match.homeTeam} vs ${match.awayTeam}`);
+          }
+        }
+      } else if (jsonData && jsonData.data && Array.isArray(jsonData.data)) {
+        console.log(`📊 Found ${jsonData.data.length} matches in data array`);
+        
+        for (let i = 0; i < jsonData.data.length; i++) {
+          const apiMatch = jsonData.data[i];
+          const match = this.convertAPIMatchToTotelepepMatch(apiMatch, i);
+          if (match) {
+            matches.push(match);
+            console.log(`✅ Converted: ${match.homeTeam} vs ${match.awayTeam}`);
+          }
+        }
+      } else if (jsonData && jsonData.result && Array.isArray(jsonData.result)) {
+        console.log(`📊 Found ${jsonData.result.length} matches in result array`);
+        
+        for (let i = 0; i < jsonData.result.length; i++) {
+          const apiMatch = jsonData.result[i];
+          const match = this.convertAPIMatchToTotelepepMatch(apiMatch, i);
+          if (match) {
+            matches.push(match);
+            console.log(`✅ Converted: ${match.homeTeam} vs ${match.awayTeam}`);
+          }
+        }
+      } else if (jsonData && jsonData.events && Array.isArray(jsonData.events)) {
+        console.log(`📊 Found ${jsonData.events.length} matches in events array`);
+        
+        for (let i = 0; i < jsonData.events.length; i++) {
+          const apiMatch = jsonData.events[i];
           const match = this.convertAPIMatchToTotelepepMatch(apiMatch, i);
           if (match) {
             matches.push(match);
@@ -131,7 +167,8 @@ class TotelepepExtractor {
           }
         }
       } else {
-        console.warn('⚠️ Unexpected JSON structure:', jsonData);
+        console.warn('⚠️ Unexpected JSON structure. Available keys:', Object.keys(jsonData || {}));
+        console.warn('⚠️ Sample of first few properties:', JSON.stringify(jsonData, null, 2).substring(0, 500));
       }
       
       console.log(`🎯 Extracted ${matches.length} total matches`);
@@ -147,32 +184,34 @@ class TotelepepExtractor {
 
   private convertAPIMatchToTotelepepMatch(apiMatch: any, index: number): TotelepepMatch | null {
     try {
+      console.log(`🔍 Converting match ${index}:`, JSON.stringify(apiMatch, null, 2));
+      
       // Map API fields to our TotelepepMatch structure
       // This will depend on the actual API response structure
       
       const match: TotelepepMatch = {
-        id: apiMatch.id || apiMatch.matchId || `api-${index}`,
-        homeTeam: apiMatch.homeTeam || apiMatch.home || apiMatch.team1 || 'Home Team',
-        awayTeam: apiMatch.awayTeam || apiMatch.away || apiMatch.team2 || 'Away Team',
-        league: apiMatch.league || apiMatch.competition || apiMatch.tournament || 'Football League',
+        id: apiMatch.id || apiMatch.matchId || apiMatch.eventId || `api-${index}`,
+        homeTeam: apiMatch.homeTeam || apiMatch.home || apiMatch.team1 || apiMatch.homeTeamName || apiMatch.participant1 || 'Home Team',
+        awayTeam: apiMatch.awayTeam || apiMatch.away || apiMatch.team2 || apiMatch.awayTeamName || apiMatch.participant2 || 'Away Team',
+        league: apiMatch.league || apiMatch.competition || apiMatch.tournament || apiMatch.competitionName || apiMatch.categoryName || 'Football League',
         kickoff: this.formatTime(apiMatch.time || apiMatch.kickoff || apiMatch.startTime),
         date: this.formatDate(apiMatch.date || apiMatch.matchDate || apiMatch.gameDate),
         status: this.parseStatus(apiMatch.status || apiMatch.state || apiMatch.matchStatus) as 'upcoming' | 'live' | 'finished',
         
         // Extract odds from API response
-        homeOdds: this.parseOdds(apiMatch.homeOdds || apiMatch.odds?.home || apiMatch.odds?.['1']),
-        drawOdds: this.parseOdds(apiMatch.drawOdds || apiMatch.odds?.draw || apiMatch.odds?.['X']),
-        awayOdds: this.parseOdds(apiMatch.awayOdds || apiMatch.odds?.away || apiMatch.odds?.['2']),
+        homeOdds: this.parseOdds(apiMatch.homeOdds || apiMatch.odds?.home || apiMatch.odds?.['1'] || apiMatch.homeWinOdds),
+        drawOdds: this.parseOdds(apiMatch.drawOdds || apiMatch.odds?.draw || apiMatch.odds?.['X'] || apiMatch.drawOdds),
+        awayOdds: this.parseOdds(apiMatch.awayOdds || apiMatch.odds?.away || apiMatch.odds?.['2'] || apiMatch.awayWinOdds),
         
         overUnder: {
-          over: this.parseOdds(apiMatch.overOdds || apiMatch.odds?.over || apiMatch.totals?.over),
-          under: this.parseOdds(apiMatch.underOdds || apiMatch.odds?.under || apiMatch.totals?.under),
+          over: this.parseOdds(apiMatch.overOdds || apiMatch.odds?.over || apiMatch.totals?.over || apiMatch.over25),
+          under: this.parseOdds(apiMatch.underOdds || apiMatch.odds?.under || apiMatch.totals?.under || apiMatch.under25),
           line: apiMatch.line || apiMatch.totals?.line || 2.5,
         },
         
         bothTeamsScore: {
-          yes: this.parseOdds(apiMatch.bttsYes || apiMatch.odds?.bttsYes || apiMatch.btts?.yes),
-          no: this.parseOdds(apiMatch.bttsNo || apiMatch.odds?.bttsNo || apiMatch.btts?.no),
+          yes: this.parseOdds(apiMatch.bttsYes || apiMatch.odds?.bttsYes || apiMatch.btts?.yes || apiMatch.bothTeamsScoreYes),
+          no: this.parseOdds(apiMatch.bttsNo || apiMatch.odds?.bttsNo || apiMatch.btts?.no || apiMatch.bothTeamsScoreNo),
         },
         
         // Live match data
@@ -181,6 +220,7 @@ class TotelepepExtractor {
         minute: apiMatch.minute || apiMatch.time?.minute,
       };
       
+      console.log(`🎯 Converted match: ${match.homeTeam} vs ${match.awayTeam}`);
       return this.isValidMatch(match) ? match : null;
       
     } catch (error) {
