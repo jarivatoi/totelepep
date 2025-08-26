@@ -1,7 +1,24 @@
 // PWA utility functions
 
+// Check if we're in a supported environment for Service Workers
+const isServiceWorkerSupported = (): boolean => {
+  return (
+    'serviceWorker' in navigator &&
+    !window.location.hostname.includes('stackblitz') &&
+    !window.location.hostname.includes('webcontainer')
+  );
+};
+
+// Check if we're in a supported environment for Background Sync
+const isBackgroundSyncSupported = (): boolean => {
+  return (
+    isServiceWorkerSupported() &&
+    'sync' in window.ServiceWorkerRegistration.prototype
+  );
+};
+
 export const registerServiceWorker = async (): Promise<void> => {
-  if ('serviceWorker' in navigator) {
+  if (isServiceWorkerSupported()) {
     try {
       const registration = await navigator.serviceWorker.register('/sw.js');
       console.log('Service Worker registered successfully:', registration);
@@ -21,8 +38,10 @@ export const registerServiceWorker = async (): Promise<void> => {
       });
       
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
+      console.warn('Service Worker registration failed:', error);
     }
+  } else {
+    console.info('Service Worker not supported in this environment (StackBlitz/WebContainer)');
   }
 };
 
@@ -55,17 +74,19 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 };
 
 export const scheduleBackgroundSync = (): void => {
-  if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+  if (isBackgroundSyncSupported()) {
     navigator.serviceWorker.ready.then((registration) => {
       return registration.sync.register('background-sync-matches');
     }).catch((error) => {
-      console.error('Background sync registration failed:', error);
+      console.warn('Background sync registration failed:', error);
     });
+  } else {
+    console.info('Background sync not supported in this environment');
   }
 };
 
 export const checkForUpdates = async (): Promise<void> => {
-  if ('serviceWorker' in navigator) {
+  if (isServiceWorkerSupported()) {
     const registration = await navigator.serviceWorker.getRegistration();
     if (registration) {
       await registration.update();
