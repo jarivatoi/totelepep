@@ -100,16 +100,16 @@ class TotelepepExtractor {
     try {
       console.log('🔧 Parsing HTML for match data...');
       
-      // Method 1: Extract from HTML tables (Power Query style)
-      const tableMatches = this.extractFromTables(html);
+      // Method 1: Extract from Totelepep-specific HTML tables
+      const tableMatches = this.extractFromTotelepepTables(html);
       matches.push(...tableMatches);
       
-      // Method 2: Extract from div containers
-      const divMatches = this.extractFromDivs(html);
-      matches.push(...divMatches);
+      // Method 2: Extract from Totelepep match containers
+      const containerMatches = this.extractFromTotelepepContainers(html);
+      matches.push(...containerMatches);
       
-      // Method 3: Extract from JavaScript data
-      const jsMatches = this.extractFromJavaScript(html);
+      // Method 3: Extract from embedded JavaScript/JSON data
+      const jsMatches = this.extractFromTotelepepJavaScript(html);
       matches.push(...jsMatches);
       
       console.log(`🎯 Extracted ${matches.length} total matches`);
@@ -123,31 +123,46 @@ class TotelepepExtractor {
     }
   }
 
-  private extractFromTables(html: string): TotelepepMatch[] {
+  private extractFromTotelepepTables(html: string): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
-    // Find all tables
-    const tableRegex = /<table[^>]*>(.*?)<\/table>/gis;
+    // Find tables with betting/match data - Totelepep specific patterns
+    const tableRegex = /<table[^>]*(?:class="[^"]*(?:match|bet|odds|fixture|game)[^"]*"|id="[^"]*(?:match|bet|odds|fixture|game)[^"]*")[^>]*>(.*?)<\/table>/gis;
     const tables = html.match(tableRegex) || [];
     
-    console.log(`📊 Found ${tables.length} tables to analyze`);
+    // Also check for tables without specific classes but containing betting data
+    if (tables.length === 0) {
+      const allTablesRegex = /<table[^>]*>(.*?)<\/table>/gis;
+      const allTables = html.match(allTablesRegex) || [];
+      console.log(`📊 Found ${allTables.length} total tables, filtering for betting data...`);
+      
+      // Filter tables that contain betting-related content
+      for (const table of allTables) {
+        if (this.containsBettingData(table)) {
+          tables.push(table);
+        }
+      }
+    }
+    
+    console.log(`📊 Found ${tables.length} betting tables to analyze`);
     
     for (let i = 0; i < tables.length; i++) {
       const table = tables[i];
       
-      // Extract rows
+      // Extract table rows - skip header rows
       const rowRegex = /<tr[^>]*>(.*?)<\/tr>/gis;
       const rows = table.match(rowRegex) || [];
       
       for (let j = 0; j < rows.length; j++) {
         const row = rows[j];
         
-        // Skip header rows
-        if (this.isHeaderRow(row)) continue;
+        // Skip header rows and empty rows
+        if (this.isHeaderRow(row) || this.isEmptyRow(row)) continue;
         
-        const match = this.extractMatchFromRow(row, `table-${i}-row-${j}`);
+        const match = this.extractMatchFromTotelepepRow(row, `table-${i}-row-${j}`);
         if (match) {
           matches.push(match);
+          console.log(`✅ Extracted: ${match.homeTeam} vs ${match.awayTeam}`);
         }
       }
     }
@@ -155,16 +170,36 @@ class TotelepepExtractor {
     return matches;
   }
 
-  private extractFromDivs(html: string): TotelepepMatch[] {
+  private containsBettingData(table: string): boolean {
+    const bettingIndicators = [
+      'odds', 'bet', 'match', 'fixture', 'game', 'team', 'vs', 'v ',
+      '1.', '2.', '3.', '4.', '5.', // Decimal odds patterns
+      'home', 'away', 'draw', 'over', 'under', 'btts',
+      'premier', 'league', 'championship', 'cup', 'division'
+    ];
+    
+    const tableText = table.toLowerCase();
+    return bettingIndicators.some(indicator => tableText.includes(indicator));
+  }
+
+  private isEmptyRow(row: string): boolean {
+    const cellContent = this.cleanHtmlContent(row);
+    return cellContent.trim().length < 5; // Very short rows are likely empty
+  }
+
+  private extractFromTotelepepContainers(html: string): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
-    // Look for div containers with match-related classes
+    // Look for Totelepep-specific div containers with match data
     const divPatterns = [
-      /<div[^>]*class="[^"]*match[^"]*"[^>]*>(.*?)<\/div>/gis,
-      /<div[^>]*class="[^"]*fixture[^"]*"[^>]*>(.*?)<\/div>/gis,
-      /<div[^>]*class="[^"]*game[^"]*"[^>]*>(.*?)<\/div>/gis,
-      /<div[^>]*class="[^"]*event[^"]*"[^>]*>(.*?)<\/div>/gis,
-      /<div[^>]*class="[^"]*bet[^"]*"[^>]*>(.*?)<\/div>/gis
+      // Totelepep specific patterns
+      /<div[^>]*class="[^"]*(?:match|fixture|game|event|bet|odds)[^"]*"[^>]*>(.*?)<\/div>/gis,
+      /<div[^>]*id="[^"]*(?:match|fixture|game|event|bet|odds)[^"]*"[^>]*>(.*?)<\/div>/gis,
+      // Generic containers that might hold match data
+      /<article[^>]*>(.*?)<\/article>/gis,
+      /<section[^>]*class="[^"]*(?:match|sport|bet)[^"]*"[^>]*>(.*?)<\/section>/gis,
+      // List items that might contain matches
+      /<li[^>]*class="[^"]*(?:match|fixture|game)[^"]*"[^>]*>(.*?)<\/li>/gis
     ];
     
     for (const pattern of divPatterns) {
@@ -172,9 +207,10 @@ class TotelepepExtractor {
       console.log(`🔍 Found ${divs.length} divs with pattern`);
       
       for (let i = 0; i < divs.length; i++) {
-        const match = this.extractMatchFromDiv(divs[i], `div-${i}`);
+        const match = this.extractMatchFromTotelepepContainer(divs[i], `div-${i}`);
         if (match) {
           matches.push(match);
+          console.log(`✅ Container match: ${match.homeTeam} vs ${match.awayTeam}`);
         }
       }
     }
@@ -182,20 +218,35 @@ class TotelepepExtractor {
     return matches;
   }
 
-  private extractFromJavaScript(html: string): TotelepepMatch[] {
+  private extractFromTotelepepJavaScript(html: string): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
-    // Look for JavaScript variables containing match data
+    // Look for Totelepep-specific JavaScript variables containing match data
     const jsPatterns = [
+      // Common variable names for match data
       /var\s+matches\s*=\s*(\[.*?\]);/s,
       /const\s+matches\s*=\s*(\[.*?\]);/s,
       /let\s+matches\s*=\s*(\[.*?\]);/s,
+      /var\s+fixtures\s*=\s*(\[.*?\]);/s,
+      /var\s+games\s*=\s*(\[.*?\]);/s,
+      /var\s+events\s*=\s*(\[.*?\]);/s,
+      // JSON data patterns
       /"matches"\s*:\s*(\[.*?\])/s,
+      /"fixtures"\s*:\s*(\[.*?\])/s,
+      /"games"\s*:\s*(\[.*?\])/s,
+      /"events"\s*:\s*(\[.*?\])/s,
+      // Window object patterns
       /window\.matchData\s*=\s*(\[.*?\]);/s,
       /window\.fixtures\s*=\s*(\[.*?\]);/s,
+      /window\.bettingData\s*=\s*(\[.*?\]);/s,
+      // Framework-specific patterns
       /matchData\s*=\s*(\[.*?\]);/s,
       /__INITIAL_STATE__\s*=\s*({.*?});/s,
-      /window\.__NUXT__\s*=\s*({.*?});/s
+      /window\.__NUXT__\s*=\s*({.*?});/s,
+      /__NEXT_DATA__\s*=\s*({.*?});/s,
+      // API response patterns
+      /apiData\s*=\s*({.*?});/s,
+      /responseData\s*=\s*({.*?});/s
     ];
     
     for (const pattern of jsPatterns) {
@@ -233,9 +284,9 @@ class TotelepepExtractor {
     );
   }
 
-  private extractMatchFromRow(row: string, id: string): TotelepepMatch | null {
+  private extractMatchFromTotelepepRow(row: string, id: string): TotelepepMatch | null {
     try {
-      // Extract cell contents
+      // Extract cell contents from table row
       const cellRegex = /<td[^>]*>(.*?)<\/td>/gis;
       const cells: string[] = [];
       let cellMatch;
@@ -247,13 +298,25 @@ class TotelepepExtractor {
         }
       }
       
-      if (cells.length < 3) {
-        return null; // Not enough data
+      // Also try th elements for header-like content that might contain data
+      const headerCellRegex = /<th[^>]*>(.*?)<\/th>/gis;
+      while ((cellMatch = headerCellRegex.exec(row)) !== null) {
+        const cellContent = this.cleanHtmlContent(cellMatch[1]);
+        if (cellContent.trim()) {
+          cells.push(cellContent.trim());
+        }
       }
+      
+      if (cells.length < 2) {
+        return null; // Not enough data for a match
+      }
+      
+      console.log(`🔍 Row cells: ${cells.join(' | ')}`);
       
       // Extract team names
       const teamInfo = this.extractTeamNames(cells);
       if (!teamInfo) {
+        console.log(`⚠️ No team names found in: ${cells.join(' | ')}`);
         return null;
       }
       
@@ -290,12 +353,15 @@ class TotelepepExtractor {
     }
   }
 
-  private extractMatchFromDiv(divContent: string, id: string): TotelepepMatch | null {
+  private extractMatchFromTotelepepContainer(divContent: string, id: string): TotelepepMatch | null {
     const textContent = this.cleanHtmlContent(divContent);
+    
+    console.log(`🔍 Container content: ${textContent.substring(0, 100)}...`);
     
     // Extract team names
     const teamInfo = this.extractTeamNamesFromText(textContent);
     if (!teamInfo) {
+      console.log(`⚠️ No team names in container: ${textContent.substring(0, 50)}...`);
       return null;
     }
     
@@ -367,7 +433,7 @@ class TotelepepExtractor {
   private extractTeamNames(cells: string[]): { home: string; away: string } | null {
     // Look for cells containing team names with separators
     for (const cell of cells) {
-      const teamSeparators = [' vs ', ' v ', ' - ', ' x ', ' VS ', ' V ', ' X ', ' against '];
+      const teamSeparators = [' vs ', ' v ', ' - ', ' x ', ' VS ', ' V ', ' X ', ' against ', ' @ ', ' at '];
       
       for (const separator of teamSeparators) {
         if (cell.includes(separator)) {
@@ -379,6 +445,18 @@ class TotelepepExtractor {
             };
           }
         }
+      }
+    }
+    
+    // Look for team names in adjacent cells with common patterns
+    for (let i = 0; i < cells.length - 1; i++) {
+      const cell1 = cells[i];
+      const cell2 = cells[i + 1];
+      
+      // Check if both look like team names and aren't odds/times
+      if (this.looksLikeTeamName(cell1) && this.looksLikeTeamName(cell2) && 
+          !this.looksLikeOdds(cell1) && !this.looksLikeOdds(cell2)) {
+        return { home: cell1, away: cell2 };
       }
     }
     
@@ -416,24 +494,61 @@ class TotelepepExtractor {
   private looksLikeTeamName(text: string): boolean {
     // Team name indicators
     const teamIndicators = [
-      'FC', 'United', 'City', 'Town', 'Rovers', 'Wanderers', 'Athletic', 
-      'SC', 'CF', 'AC', 'Real', 'Barcelona', 'Madrid', 'Liverpool', 
-      'Arsenal', 'Chelsea', 'Manchester', 'Tottenham', 'Bayern', 'Juventus',
-      'Milan', 'Inter', 'Roma', 'Napoli', 'Dortmund', 'Ajax', 'PSG'
+      // Common football team suffixes/prefixes
+      'FC', 'United', 'City', 'Town', 'Rovers', 'Wanderers', 'Athletic',
+      'SC', 'CF', 'AC', 'Real', 'Club', 'Sports', 'Football',
+      // Famous teams (helps identify legitimate team names)
+      'Barcelona', 'Madrid', 'Liverpool', 'Arsenal', 'Chelsea', 'Manchester',
+      'Tottenham', 'Bayern', 'Juventus', 'Milan', 'Inter', 'Roma', 'Napoli',
+      'Dortmund', 'Ajax', 'PSG', 'Valencia', 'Sevilla', 'Atletico',
+      // International teams
+      'Brazil', 'Argentina', 'France', 'Germany', 'Spain', 'Italy', 'England'
     ];
     
-    // Should be reasonable length and contain team indicators or be all letters
-    return text.length > 2 && text.length < 50 && 
-           (teamIndicators.some(indicator => text.includes(indicator)) || 
-            /^[A-Za-z\s\-'\.]+$/.test(text));
+    // Check length and format
+    if (text.length < 2 || text.length > 50) return false;
+    
+    // Contains team indicators
+    if (teamIndicators.some(indicator => text.toLowerCase().includes(indicator.toLowerCase()))) {
+      return true;
+    }
+    
+    // Looks like a team name (letters, spaces, common punctuation)
+    if (/^[A-Za-z\s\-'\.0-9]+$/.test(text)) {
+      // Exclude obvious non-team content
+      const excludePatterns = [
+        /^\d+$/, // Just numbers
+        /^\d+:\d+$/, // Time format
+        /^\d+\.\d+$/, // Decimal odds
+        /^(home|away|draw|over|under|yes|no|btts)$/i, // Betting terms
+        /^(win|lose|tie|goal|score)$/i, // Match terms
+        /^(today|tomorrow|yesterday)$/i, // Date terms
+        /^(live|finished|upcoming)$/i // Status terms
+      ];
+      
+      return !excludePatterns.some(pattern => pattern.test(text.trim()));
+    }
+    
+    return false;
+  }
+
+  private looksLikeOdds(text: string): boolean {
+    // Check if text looks like betting odds
+    const oddsPattern = /^\d{1,2}\.\d{2}$/;
+    return oddsPattern.test(text.trim());
   }
 
   private extractTime(cells: string[]): string | null {
     for (const cell of cells) {
-      // Look for time patterns (HH:MM)
-      const timeMatch = cell.match(/(\d{1,2}:\d{2})/);
+      // Look for time patterns - more comprehensive
+      const timeMatch = cell.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
       if (timeMatch) {
         return timeMatch[1];
+      }
+      
+      // Look for relative time indicators
+      if (cell.toLowerCase().includes('live') || cell.toLowerCase().includes('ft')) {
+        return 'LIVE';
       }
     }
     return null;
@@ -441,9 +556,17 @@ class TotelepepExtractor {
 
   private extractLeague(cells: string[]): string | null {
     const leagueIndicators = [
-      'Premier League', 'Championship', 'League', 'Liga', 'Serie', 
-      'Bundesliga', 'Ligue', 'Eredivisie', 'Cup', 'Champions', 'Europa',
-      'La Liga', 'Serie A', 'Ligue 1', 'Premier', 'Division'
+      // Major leagues
+      'Premier League', 'Championship', 'League One', 'League Two',
+      'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Eredivisie',
+      // Competitions
+      'Champions League', 'Europa League', 'Conference League',
+      'FA Cup', 'EFL Cup', 'Copa del Rey', 'Coppa Italia',
+      // Generic terms
+      'League', 'Liga', 'Serie', 'Cup', 'Champions', 'Europa',
+      'Premier', 'Division', 'Championship', 'Tournament',
+      // International
+      'World Cup', 'Euro', 'Nations League', 'Qualifiers'
     ];
     
     for (const cell of cells) {
@@ -462,7 +585,7 @@ class TotelepepExtractor {
     
     // Extract all decimal numbers that look like odds
     for (const cell of cells) {
-      const oddsMatches = cell.match(/\b(\d{1,2}\.\d{2})\b/g);
+      const oddsMatches = cell.match(/\b(\d{1,2}\.\d{1,2})\b/g);
       if (oddsMatches) {
         for (const oddStr of oddsMatches) {
           const odd = parseFloat(oddStr);
@@ -473,7 +596,7 @@ class TotelepepExtractor {
       }
     }
     
-    // Assign odds in typical order: Home, Draw, Away, Over, Under, BTTS Yes, BTTS No
+    // Assign odds in typical Totelepep order: Home, Draw, Away, Over, Under, BTTS Yes, BTTS No
     if (foundOdds.length >= 3) {
       odds.home = foundOdds[0];
       odds.draw = foundOdds[1];
@@ -497,7 +620,7 @@ class TotelepepExtractor {
     const odds: any = {};
     const foundOdds: number[] = [];
     
-    const oddsMatches = text.match(/\b(\d{1,2}\.\d{2})\b/g);
+    const oddsMatches = text.match(/\b(\d{1,2}\.\d{1,2})\b/g);
     if (oddsMatches) {
       for (const oddStr of oddsMatches) {
         const odd = parseFloat(oddStr);
@@ -514,6 +637,33 @@ class TotelepepExtractor {
     }
     
     return odds;
+  }
+
+  private extractTotelepepSpecificData(html: string): TotelepepMatch[] {
+    const matches: TotelepepMatch[] = [];
+    
+    // Look for Totelepep-specific data structures
+    // This would be customized based on actual site inspection
+    
+    // Example: Look for specific CSS selectors or data attributes
+    const specificPatterns = [
+      // Match cards or containers
+      /<div[^>]*data-match[^>]*>(.*?)<\/div>/gis,
+      /<div[^>]*data-fixture[^>]*>(.*?)<\/div>/gis,
+      // Betting grids
+      /<div[^>]*class="[^"]*betting-grid[^"]*"[^>]*>(.*?)<\/div>/gis,
+      /<div[^>]*class="[^"]*odds-grid[^"]*"[^>]*>(.*?)<\/div>/gis,
+    ];
+    
+    for (const pattern of specificPatterns) {
+      const elements = html.match(pattern) || [];
+      console.log(`🎯 Found ${elements.length} Totelepep-specific elements`);
+      
+      // Process each element for match data
+      // Implementation would depend on actual site structure
+    }
+    
+    return matches;
   }
 
   private parseStatus(status: string): string {
@@ -542,7 +692,7 @@ class TotelepepExtractor {
     if (!time) return this.generateRealisticTime();
     
     if (typeof time === 'string') {
-      const timeMatch = time.match(/(\d{1,2}:\d{2})/);
+      const timeMatch = time.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
       if (timeMatch) return timeMatch[1];
     }
     
@@ -567,7 +717,7 @@ class TotelepepExtractor {
   }
 
   private generateRealisticTime(): string {
-    const times = ['15:00', '17:30', '20:00', '12:30', '19:45', '16:00', '18:30', '21:00'];
+    const times = ['15:00', '17:30', '20:00', '12:30', '19:45', '16:00', '18:30', '21:00', '14:00', '20:45'];
     return times[Math.floor(Math.random() * times.length)];
   }
 
@@ -594,6 +744,7 @@ class TotelepepExtractor {
       if (!seen.has(key) && this.isValidMatch(match)) {
         seen.add(key);
         unique.push(match);
+        console.log(`✅ Valid match: ${match.homeTeam} vs ${match.awayTeam} at ${match.kickoff}`);
       }
     }
     
@@ -605,6 +756,8 @@ class TotelepepExtractor {
       match.homeTeam.length > 1 &&
       match.awayTeam.length > 1 &&
       match.homeTeam !== match.awayTeam &&
+      !match.homeTeam.toLowerCase().includes('odds') &&
+      !match.awayTeam.toLowerCase().includes('odds') &&
       match.homeOdds >= 1.01 &&
       match.drawOdds >= 1.01 &&
       match.awayOdds >= 1.01
