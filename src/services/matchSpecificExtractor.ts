@@ -212,10 +212,26 @@ class MatchSpecificExtractor {
   private extractBTTSOdds(market: any, oddsData: MatchOddsData): void {
     console.log(`   🎯 Processing BTTS market: "${market.marketDisplayName}" (Book: ${market.marketBookNo})`);
     
-    // Only process the exact "Both Team To Score " market (with trailing space)
-    if (market.marketDisplayName !== "Both Team To Score ") {
+    // Power Query exact match: if [marketDisplayName] = "Both Team To Score "
+    const marketName = market.marketDisplayName || '';
+    
+    // Try exact Power Query match first
+    const isExactBTTSMatch = marketName === "Both Team To Score ";
+    
+    // Also try variations in case of encoding differences
+    const isBTTSVariation = marketName.trim() === "Both Team To Score" ||
+                           marketName === "Both Team To Score" ||
+                           marketName.includes("Both Team To Score");
+    
+    if (!isExactBTTSMatch && !isBTTSVariation) {
       console.log(`   ⚠️ Skipping non-BTTS market: "${market.marketDisplayName}"`);
       return;
+    }
+    
+    if (isExactBTTSMatch) {
+      console.log(`   ✅ EXACT Power Query match: "${marketName}"`);
+    } else {
+      console.log(`   ⚠️ Using BTTS variation: "${marketName}"`);
     }
     
     // Store the market book number for Power Query compatibility
