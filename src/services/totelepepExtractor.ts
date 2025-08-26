@@ -273,7 +273,18 @@ class TotelepepExtractor {
         };
         
         const monthNum = monthMap[month] || '01';
-        const year = new Date().getFullYear(); // Assume current year
+        
+        // Determine year - if month is before current month, it's next year
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        const matchMonth = parseInt(monthNum);
+        
+        let year = currentYear;
+        if (matchMonth < currentMonth) {
+          year = currentYear + 1;
+        }
+        
         const date = `${year}-${monthNum}-${day.padStart(2, '0')}`;
         
         return { date, time };
