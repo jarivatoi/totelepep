@@ -16,6 +16,7 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
     setIsExtracting(true);
     setExtractionStatus('Connecting to Totelepep...');
     setExtractedCount(0);
+    setShowDebugData(true); // Automatically show debug data
 
     try {
       // Simulate the extraction process with status updates
