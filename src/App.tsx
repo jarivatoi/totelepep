@@ -4,7 +4,10 @@ import DateGroupedMatches from './components/DateGroupedMatches';
 import Header from './components/Header';
 import StatsCards from './components/StatsCards';
 import ParlayBuilder, { ParlaySelection } from './components/ParlayBuilder';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { totelepepService, TotelepepMatch } from './services/totelepepService';
+import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
+import { usePWA } from './hooks/usePWA';
 
 function App() {
   const [matches, setMatches] = useState<TotelepepMatch[]>([]);
@@ -15,12 +18,20 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [parlaySelections, setParlaySelections] = useState<ParlaySelection[]>([]);
   const [showParlay, setShowParlay] = useState(false);
+  
+  const { isOnline } = usePWA();
 
+  // Initialize PWA features
+  useEffect(() => {
+    registerServiceWorker();
+    requestNotificationPermission();
+    scheduleBackgroundSync();
+  }, []);
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('Fetching data from Totelepep...');
+      console.log('🔍 Fetching data from Totelepep...');
       const fetchedMatches = await totelepepService.getMatches();
       
       // Sort matches by date and time
@@ -32,10 +43,14 @@ function App() {
       setGroupedMatches(grouped);
       
       setLastUpdated(new Date());
-      console.log(`Loaded ${sortedMatches.length} matches from Totelepep`);
+      console.log(`✅ Loaded ${sortedMatches.length} matches from Totelepep`);
+      
+      if (sortedMatches.length === 0) {
+        setError('No matches found on Totelepep. The site may be down or have changed structure.');
+      }
     } catch (error) {
       console.error('Error loading data:', error);
-      setError('Failed to load data from Totelepep.');
+      setError(isOnline ? 'Failed to load data from Totelepep. The site may be temporarily unavailable.' : 'You are offline. Showing cached data if available.');
     } finally {
       setLoading(false);
     }
@@ -44,10 +59,14 @@ function App() {
   useEffect(() => {
     loadData();
     
-    // Auto-reload every 5 minutes for live data
-    const interval = setInterval(loadData, 300000);
+    // Auto-reload every 5 minutes for live data (only when online)
+    const interval = setInterval(() => {
+      if (isOnline) {
+        loadData();
+      }
+    }, 300000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isOnline]);
 
   // Filter matches and maintain grouping
   const filteredGroupedMatches = React.useMemo(() => {
@@ -124,7 +143,7 @@ function App() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">All Totelepep Matches - Global Coverage</h1>
               <p className="text-gray-600">
-                Last updated: {lastUpdated.toLocaleTimeString()} • All leagues worldwide • Auto-refresh every 5 minutes
+                Last updated: {lastUpdated.toLocaleTimeString()} • All leagues worldwide • Auto-refresh every 5 minutes {!isOnline && '(Offline)'}
               </p>
               {error && (
                 <div className="flex items-center gap-2 mt-2 text-red-600">
@@ -158,10 +177,14 @@ function App() {
               <button
                 onClick={loadData}
                 disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95 ${
+                  isOnline 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'bg-gray-400 text-white cursor-not-allowed'
+                }`}
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Loading...' : 'Reload Data'}
+                {loading ? 'Loading...' : isOnline ? 'Reload Data' : 'Offline'}
               </button>
             </div>
           </div>
@@ -204,6 +227,8 @@ function App() {
           )}
         </div>
       </main>
+      
+      <PWAInstallPrompt />
     </div>
   );
 }
