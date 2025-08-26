@@ -180,7 +180,11 @@ class TotelepepExtractor {
         return null;
       }
       
-      console.log(`🔍 Entry ${index} fields:`, fields.slice(0, 15)); // Show first 15 fields
+      console.log(`🔍 Entry ${index} ALL fields (${fields.length} total):`, fields);
+      
+      // Extract ALL possible odds from the entry
+      const allOdds = this.extractAllOddsFromEntry(fields, index);
+      console.log(`📊 Entry ${index} - All extracted odds:`, allOdds);
       
       // Parse Totelepep match entry format:
       // 0: matchId, 1: competitionId, 2: teams, 3: datetime, 4: homeScore, 5: awayScore, 
@@ -189,9 +193,11 @@ class TotelepepExtractor {
       const matchId = fields[0];
       const teamsString = fields[2]; // e.g., "Austria Lustenau v Kapfenberger SV"
       const datetime = fields[3]; // e.g., "26 Aug 20:30"
-      const homeOdds = parseFloat(fields[7]);
-      const drawOdds = parseFloat(fields[9]);
-      const awayOdds = parseFloat(fields[11]);
+      
+      // Use comprehensive odds extraction
+      const homeOdds = allOdds.homeOdds || parseFloat(fields[7]);
+      const drawOdds = allOdds.drawOdds || parseFloat(fields[9]);
+      const awayOdds = allOdds.awayOdds || parseFloat(fields[11]);
       
       // Extract team names from teams string
       const teamNames = this.extractTeamNamesFromTotelepepString(teamsString);
@@ -219,15 +225,20 @@ class TotelepepExtractor {
         drawOdds: isNaN(drawOdds) ? this.generateRealisticOdds() : drawOdds,
         awayOdds: isNaN(awayOdds) ? this.generateRealisticOdds() : awayOdds,
         overUnder: {
-          over: this.generateRealisticOdds(),
-          under: this.generateRealisticOdds(),
+          over: allOdds.overOdds || this.generateRealisticOdds(),
+          under: allOdds.underOdds || this.generateRealisticOdds(),
           line: 2.5,
         },
         bothTeamsScore: {
-          yes: this.generateRealisticOdds(),
-          no: this.generateRealisticOdds(),
+          yes: allOdds.bttsYes || this.generateRealisticOdds(),
+          no: allOdds.bttsNo || this.generateRealisticOdds(),
         },
       };
+      
+      console.log(`✅ Final match odds for ${match.homeTeam} vs ${match.awayTeam}:`);
+      console.log(`   1X2: ${match.homeOdds}/${match.drawOdds}/${match.awayOdds}`);
+      console.log(`   O/U: ${match.overUnder.over}/${match.overUnder.under}`);
+      console.log(`   BTTS: ${match.bothTeamsScore.yes}/${match.bothTeamsScore.no}`);
       
       return this.isValidMatch(match) ? match : null;
       
@@ -235,6 +246,133 @@ class TotelepepExtractor {
       console.warn(`⚠️ Error parsing match entry ${index}:`, error, entry.substring(0, 100));
       return null;
     }
+  }
+
+  private extractAllOddsFromEntry(fields: string[], entryIndex: number): any {
+    const odds: any = {
+      homeOdds: null,
+      drawOdds: null,
+      awayOdds: null,
+      overOdds: null,
+      underOdds: null,
+      bttsYes: null,
+      bttsNo: null,
+      allFoundOdds: []
+    };
+
+    console.log(`🔍 Analyzing entry ${entryIndex} for odds...`);
+
+    // Extract all numeric values that could be odds
+    fields.forEach((field, index) => {
+      const trimmedField = field.trim();
+      
+      // Check if field is a decimal number (potential odds)
+      const oddsMatch = trimmedField.match(/^\d{1,3}\.\d{1,3}$/) || trimmedField.match(/^\d{1,3}$/) || trimmedField.match(/^\d{1,3}\d{2}$/);
+      
+      if (oddsMatch) {
+        let oddsValue = parseFloat(trimmedField);
+        
+        // Handle integer odds (like 150 = 1.50)
+        if (oddsValue > 100 && oddsValue < 10000 && !trimmedField.includes('.')) {
+          oddsValue = oddsValue / 100;
+        }
+        
+        // Only consider realistic betting odds
+        if (oddsValue >= 1.01 && oddsValue <= 50.0) {
+          odds.allFoundOdds.push({
+            index,
+            field: trimmedField,
+            value: oddsValue,
+            context: fields[index - 1] || '',
+            nextField: fields[index + 1] || ''
+          });
+          
+          console.log(`   📈 Field ${index}: "${trimmedField}" = ${oddsValue} (context: "${fields[index - 1] || ''}" -> "${fields[index + 1] || ''}")`);
+        }
+      }
+    });
+
+    // Try to identify specific odds types based on context and position
+    odds.allFoundOdds.forEach((odd: any, i: number) => {
+      const context = odd.context.toLowerCase();
+      const nextField = odd.nextField.toLowerCase();
+      const prevField = fields[odd.index - 2]?.toLowerCase() || '';
+      
+      // 1X2 Odds identification
+      if (odd.index === 7 && !odds.homeOdds) odds.homeOdds = odd.value;
+      if (odd.index === 9 && !odds.drawOdds) odds.drawOdds = odd.value;
+      if (odd.index === 11 && !odds.awayOdds) odds.awayOdds = odd.value;
+      
+      // BTTS identification by context
+      if (context.includes('btts') || context.includes('both') || context.includes('score')) {
+        if (!odds.bttsYes) odds.bttsYes = odd.value;
+        else if (!odds.bttsNo) odds.bttsNo = odd.value;
+      }
+      
+      // Over/Under identification
+      if (context.includes('over') || context.includes('o') || nextField.includes('over')) {
+        if (!odds.overOdds) odds.overOdds = odd.value;
+      }
+      if (context.includes('under') || context.includes('u') || nextField.includes('under')) {
+        if (!odds.underOdds) odds.underOdds = odd.value;
+      }
+      
+      // Pattern-based BTTS detection (common patterns)
+      if (i < odds.allFoundOdds.length - 1) {
+        const nextOdd = odds.allFoundOdds[i + 1];
+        
+        // If we have two consecutive odds in a reasonable BTTS range
+        if (odd.value >= 1.20 && odd.value <= 2.50 && 
+            nextOdd.value >= 1.50 && nextOdd.value <= 3.50 &&
+            Math.abs(odd.index - nextOdd.index) <= 2) {
+          
+          // Lower odds typically = BTTS Yes, Higher odds = BTTS No
+          if (odd.value < nextOdd.value && !odds.bttsYes && !odds.bttsNo) {
+            odds.bttsYes = odd.value;
+            odds.bttsNo = nextOdd.value;
+            console.log(`   🎯 BTTS Pattern detected: Yes=${odd.value} (field ${odd.index}), No=${nextOdd.value} (field ${nextOdd.index})`);
+          }
+        }
+      }
+    });
+
+    // Fallback: assign remaining unassigned odds to missing categories
+    const unassignedOdds = odds.allFoundOdds.filter((odd: any) => {
+      return odd.index !== 7 && odd.index !== 9 && odd.index !== 11; // Not 1X2 odds
+    });
+
+    if (!odds.bttsYes && !odds.bttsNo && unassignedOdds.length >= 2) {
+      // Take the last two reasonable odds as BTTS
+      const lastTwo = unassignedOdds.slice(-2);
+      if (lastTwo.length === 2) {
+        odds.bttsYes = Math.min(lastTwo[0].value, lastTwo[1].value);
+        odds.bttsNo = Math.max(lastTwo[0].value, lastTwo[1].value);
+        console.log(`   🔄 Fallback BTTS assignment: Yes=${odds.bttsYes}, No=${odds.bttsNo}`);
+      }
+    }
+
+    if (!odds.overOdds && !odds.underOdds && unassignedOdds.length >= 2) {
+      // Take middle odds as Over/Under
+      const middleOdds = unassignedOdds.slice(2, 4);
+      if (middleOdds.length >= 2) {
+        odds.overOdds = middleOdds[0].value;
+        odds.underOdds = middleOdds[1].value;
+        console.log(`   🔄 Fallback O/U assignment: Over=${odds.overOdds}, Under=${odds.underOdds}`);
+      }
+    }
+
+    console.log(`📊 Entry ${entryIndex} final odds extraction:`, {
+      homeOdds: odds.homeOdds,
+      drawOdds: odds.drawOdds, 
+      awayOdds: odds.awayOdds,
+      overOdds: odds.overOdds,
+      underOdds: odds.underOdds,
+      bttsYes: odds.bttsYes,
+      bttsNo: odds.bttsNo,
+      totalOddsFound: odds.allFoundOdds.length
+    });
+
+    return odds;
   }
 
   private extractTeamNamesFromTotelepepString(teamsString: string): { home: string; away: string } | null {
