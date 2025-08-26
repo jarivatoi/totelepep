@@ -516,10 +516,11 @@ const BetPlacementAnalyzer: React.FC = () => {
           <div className="text-sm text-purple-700 space-y-2">
             <p><strong>1.</strong> Open Totelepep website in browser</p>
             <p><strong>2.</strong> Open Developer Tools (F12) → Network tab</p>
-            <p><strong>3.</strong> Place a real bet on the website</p>
-            <p><strong>4.</strong> Look for POST requests in Network tab during bet placement</p>
-            <p><strong>5.</strong> Examine the request/response to find ticket generation endpoint</p>
+            <p><strong>3.</strong> Add selections to betting slip (no login required)</p>
+            <p><strong>4.</strong> Click "Place Bet" or "Generate Booking" button</p>
+            <p><strong>5.</strong> Look for POST requests in Network tab during booking generation</p>
             <p><strong>6.</strong> Copy the exact endpoint URL and parameters</p>
+            <p><strong>7.</strong> Look for booking number in the response JSON</p>
           </div>
         </div>
 
