@@ -50,6 +50,13 @@ class TotelepepExtractor {
       // Parse JSON data (same as Power Query Json.Document)
       const matches = this.parseJSONForMatches(jsonData);
       
+      // Ensure all matches have the correct date
+      matches.forEach(match => {
+        if (!match.date || match.date === new Date().toISOString().split('T')[0]) {
+          match.date = date;
+        }
+      });
+      
       if (matches.length > 0) {
         console.log(`✅ Found ${matches.length} matches from Totelepep API`);
         this.setCachedData(matches);
@@ -274,16 +281,12 @@ class TotelepepExtractor {
         
         const monthNum = monthMap[month] || '01';
         
-        // Determine year - if month is before current month, it's next year
+        // Determine year - use current year for current and future months
         const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1;
         const currentYear = currentDate.getFullYear();
-        const matchMonth = parseInt(monthNum);
         
-        let year = currentYear;
-        if (matchMonth < currentMonth) {
-          year = currentYear + 1;
-        }
+        // For simplicity, use current year (matches are typically within current year)
+        const year = currentYear;
         
         const date = `${year}-${monthNum}-${day.padStart(2, '0')}`;
         
@@ -294,7 +297,7 @@ class TotelepepExtractor {
     }
     
     return {
-      date: this.getTodayDate(),
+      date: new Date().toISOString().split('T')[0],
       time: this.generateRealisticTime()
     };
   }

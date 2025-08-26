@@ -90,6 +90,12 @@ function App() {
   const totalMatches = matches.length;
   const totalFilteredMatches = Object.values(filteredGroupedMatches)
     .reduce((sum, dateMatches) => sum + dateMatches.length, 0);
+  
+  // Debug: Log grouped matches to see what dates we have
+  React.useEffect(() => {
+    console.log('📅 Available dates in groupedMatches:', Object.keys(groupedMatches));
+    console.log('📊 Matches per date:', Object.entries(groupedMatches).map(([date, matches]) => `${date}: ${matches.length}`));
+  }, [groupedMatches]);
 
   const handlePriceClick = (matchId: string, priceType: string, odds: number) => {
     // Find the match details
