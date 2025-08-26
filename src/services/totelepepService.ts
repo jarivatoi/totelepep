@@ -28,15 +28,17 @@ class TotelepepService {
 
   async getMatches(): Promise<TotelepepMatch[]> {
     try {
-      console.log('Fetching matches from Totelepep using Power Query logic...');
+      console.log('🔍 Fetching matches from Totelepep using Power Query logic...');
       
-      // Fetch the main page
+      // Fetch the main Totelepep page
       const response = await fetch(this.baseUrl, {
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
           'Accept-Encoding': 'gzip, deflate',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
       });
       
@@ -45,358 +47,263 @@ class TotelepepService {
       }
       
       const html = await response.text();
-      console.log('Successfully fetched HTML from Totelepep');
+      console.log('✅ Successfully fetched HTML from Totelepep');
+      console.log(`📄 HTML length: ${html.length} characters`);
       
-      // Parse using Power Query logic
-      const matches = this.parseHtmlUsingPowerQueryLogic(html);
+      // Use Power Query extraction logic
+      const matches = this.extractMatchesUsingPowerQuery(html);
       
-      if (matches.length > 0) {
-        console.log(`Successfully parsed ${matches.length} matches from Totelepep using Power Query logic`);
-        return matches;
-      } else {
-        console.warn('No matches found using Power Query logic');
-        return this.generateSampleMatches();
-      }
-      
-    } catch (error) {
-      console.error('Error fetching from Totelepep:', error);
-      console.warn('Using sample data due to error');
-      return this.generateSampleMatches();
-    }
-  }
-
-  private parseHtmlUsingPowerQueryLogic(html: string): TotelepepMatch[] {
-    const matches: TotelepepMatch[] = [];
-    
-    try {
-      // Based on the Power Query, look for table structures
-      // The Power Query seems to extract data from HTML tables
-      
-      // Look for table rows containing match data
-      const tableRowPattern = /<tr[^>]*>(.*?)<\/tr>/gis;
-      const rows = html.match(tableRowPattern) || [];
-      
-      console.log(`Found ${rows.length} table rows to analyze`);
-      
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        
-        // Skip header rows and empty rows
-        if (this.isHeaderRow(row) || this.isEmptyRow(row)) {
-          continue;
-        }
-        
-        const match = this.extractMatchFromTableRow(row, i);
-        if (match) {
-          matches.push(match);
-        }
-      }
-      
-      // Also look for div-based match containers (alternative structure)
-      const divMatchPattern = /<div[^>]*class="[^"]*match[^"]*"[^>]*>(.*?)<\/div>/gis;
-      const divMatches = html.match(divMatchPattern) || [];
-      
-      console.log(`Found ${divMatches.length} div-based matches to analyze`);
-      
-      for (let i = 0; i < divMatches.length; i++) {
-        const divMatch = divMatches[i];
-        const match = this.extractMatchFromDiv(divMatch, matches.length + i);
-        if (match) {
-          matches.push(match);
-        }
-      }
-      
-      // Look for JavaScript data (similar to Power Query's data extraction)
-      const jsMatches = this.extractMatchesFromJavaScript(html);
-      matches.push(...jsMatches);
-      
-      console.log(`Total matches extracted: ${matches.length}`);
+      console.log(`🎯 Extracted ${matches.length} matches using Power Query logic`);
       return matches;
       
     } catch (error) {
-      console.error('Error parsing HTML using Power Query logic:', error);
+      console.error('❌ Error fetching from Totelepep:', error);
+      throw new Error(`Failed to fetch matches from Totelepep: ${error.message}`);
+    }
+  }
+
+  private extractMatchesUsingPowerQuery(html: string): TotelepepMatch[] {
+    const matches: TotelepepMatch[] = [];
+    
+    try {
+      console.log('🔧 Starting Power Query extraction...');
+      
+      // Step 1: Look for HTML tables (Power Query typically extracts from tables)
+      const tableMatches = /<table[^>]*>(.*?)<\/table>/gis;
+      const tables = html.match(tableMatches) || [];
+      
+      console.log(`📊 Found ${tables.length} tables to analyze`);
+      
+      for (let tableIndex = 0; tableIndex < tables.length; tableIndex++) {
+        const table = tables[tableIndex];
+        console.log(`🔍 Analyzing table ${tableIndex + 1}...`);
+        
+        // Extract rows from this table
+        const rowMatches = /<tr[^>]*>(.*?)<\/tr>/gis;
+        const rows = table.match(rowMatches) || [];
+        
+        console.log(`📋 Found ${rows.length} rows in table ${tableIndex + 1}`);
+        
+        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+          const row = rows[rowIndex];
+          
+          // Skip header rows
+          if (this.isHeaderRow(row)) {
+            continue;
+          }
+          
+          const match = this.extractMatchFromRow(row, `table${tableIndex}-row${rowIndex}`);
+          if (match) {
+            matches.push(match);
+            console.log(`✅ Extracted match: ${match.homeTeam} vs ${match.awayTeam}`);
+          }
+        }
+      }
+      
+      // Step 2: Look for div-based match containers
+      const divMatches = this.extractFromDivContainers(html);
+      matches.push(...divMatches);
+      
+      // Step 3: Look for JavaScript embedded data
+      const jsMatches = this.extractFromJavaScript(html);
+      matches.push(...jsMatches);
+      
+      console.log(`🎯 Total matches extracted: ${matches.length}`);
+      
+      if (matches.length === 0) {
+        console.warn('⚠️ No matches found using Power Query logic');
+        console.log('📝 HTML sample for debugging:');
+        console.log(html.substring(0, 1000) + '...');
+      }
+      
+      return matches;
+      
+    } catch (error) {
+      console.error('❌ Error in Power Query extraction:', error);
       return [];
     }
   }
 
   private isHeaderRow(row: string): boolean {
-    const headerIndicators = ['<th', 'header', 'thead', 'Time', 'Team', 'Odds', 'Match'];
+    const headerIndicators = [
+      '<th', 'thead', 'header', 'Header', 'HEADER',
+      'Time', 'Team', 'Teams', 'Match', 'Odds', 'League',
+      'Competition', 'Event', 'Fixture'
+    ];
+    
     return headerIndicators.some(indicator => 
       row.toLowerCase().includes(indicator.toLowerCase())
     );
   }
 
-  private isEmptyRow(row: string): boolean {
-    const textContent = row.replace(/<[^>]*>/g, '').trim();
-    return textContent.length < 10; // Very short content likely not a match
-  }
-
-  private extractMatchFromTableRow(row: string, index: number): TotelepepMatch | null {
+  private extractMatchFromRow(row: string, id: string): TotelepepMatch | null {
     try {
-      // Extract table cells
-      const cellPattern = /<td[^>]*>(.*?)<\/td>/gis;
-      const cells = [];
+      // Extract all cell contents
+      const cellMatches = /<td[^>]*>(.*?)<\/td>/gis;
+      const cells: string[] = [];
       let cellMatch;
       
-      while ((cellMatch = cellPattern.exec(row)) !== null) {
-        const cellContent = cellMatch[1].replace(/<[^>]*>/g, '').trim();
-        cells.push(cellContent);
+      while ((cellMatch = cellMatches.exec(row)) !== null) {
+        const cellContent = this.cleanHtmlContent(cellMatch[1]);
+        if (cellContent.trim()) {
+          cells.push(cellContent.trim());
+        }
       }
       
       if (cells.length < 3) {
         return null; // Not enough data for a match
       }
       
-      // Try to identify team names (look for vs, -, or similar separators)
-      let homeTeam = '';
-      let awayTeam = '';
-      let matchTime = '';
-      let league = '';
+      console.log(`🔍 Analyzing row with ${cells.length} cells:`, cells);
       
-      // Look for team names in cells
-      for (const cell of cells) {
-        if (this.looksLikeTeamNames(cell)) {
-          const teams = this.extractTeamNames(cell);
-          if (teams) {
-            homeTeam = teams.home;
-            awayTeam = teams.away;
-          }
-        } else if (this.looksLikeTime(cell)) {
-          matchTime = cell;
-        } else if (this.looksLikeLeague(cell)) {
-          league = cell;
-        }
-      }
-      
-      // Extract odds from cells
-      const odds = this.extractOddsFromCells(cells);
-      
-      if (!homeTeam || !awayTeam) {
-        return null; // Must have team names
-      }
-      
-      return {
-        id: `totelepep-row-${index}`,
-        homeTeam,
-        awayTeam,
-        league: league || 'Football League',
-        kickoff: matchTime || this.generateRandomTime(),
-        date: this.getTodayDate(),
-        status: 'upcoming' as const,
-        homeOdds: odds.home || this.generateRealisticOdds(),
-        drawOdds: odds.draw || this.generateRealisticOdds(),
-        awayOdds: odds.away || this.generateRealisticOdds(),
-        overUnder: {
-          over: odds.over || this.generateRealisticOdds(),
-          under: odds.under || this.generateRealisticOdds(),
-          line: 2.5,
-        },
-        bothTeamsScore: {
-          yes: odds.bttsYes || this.generateRealisticOdds(),
-          no: odds.bttsNo || this.generateRealisticOdds(),
-        },
-      };
-      
-    } catch (error) {
-      console.warn('Error extracting match from table row:', error);
-      return null;
-    }
-  }
-
-  private extractMatchFromDiv(divContent: string, index: number): TotelepepMatch | null {
-    try {
-      // Extract text content from div
-      const textContent = divContent.replace(/<[^>]*>/g, ' ').trim();
-      
-      // Look for team names
-      const teams = this.extractTeamNamesFromText(textContent);
-      if (!teams) {
+      // Extract team names
+      const teamInfo = this.extractTeamNames(cells);
+      if (!teamInfo) {
         return null;
       }
       
       // Extract time
-      const timeMatch = textContent.match(/(\d{1,2}:\d{2})/);
-      const matchTime = timeMatch ? timeMatch[1] : this.generateRandomTime();
+      const matchTime = this.extractTime(cells);
+      
+      // Extract league
+      const league = this.extractLeague(cells);
       
       // Extract odds
-      const odds = this.extractOddsFromText(textContent);
+      const odds = this.extractOdds(cells);
       
       return {
-        id: `totelepep-div-${index}`,
-        homeTeam: teams.home,
-        awayTeam: teams.away,
-        league: 'Football League',
-        kickoff: matchTime,
+        id,
+        homeTeam: teamInfo.home,
+        awayTeam: teamInfo.away,
+        league: league || 'Football League',
+        kickoff: matchTime || this.generateTime(),
         date: this.getTodayDate(),
         status: 'upcoming' as const,
-        homeOdds: odds.home || this.generateRealisticOdds(),
-        drawOdds: odds.draw || this.generateRealisticOdds(),
-        awayOdds: odds.away || this.generateRealisticOdds(),
+        homeOdds: odds.home || 2.50,
+        drawOdds: odds.draw || 3.20,
+        awayOdds: odds.away || 2.80,
         overUnder: {
-          over: odds.over || this.generateRealisticOdds(),
-          under: odds.under || this.generateRealisticOdds(),
+          over: odds.over || 1.90,
+          under: odds.under || 1.90,
           line: 2.5,
         },
         bothTeamsScore: {
-          yes: odds.bttsYes || this.generateRealisticOdds(),
-          no: odds.bttsNo || this.generateRealisticOdds(),
+          yes: odds.bttsYes || 1.80,
+          no: odds.bttsNo || 2.00,
         },
       };
       
     } catch (error) {
-      console.warn('Error extracting match from div:', error);
+      console.warn('⚠️ Error extracting match from row:', error);
       return null;
     }
   }
 
-  private extractMatchesFromJavaScript(html: string): TotelepepMatch[] {
-    const matches: TotelepepMatch[] = [];
-    
-    try {
-      // Look for JavaScript arrays or objects containing match data
-      const jsPatterns = [
-        /var\s+matches\s*=\s*(\[.*?\]);/s,
-        /const\s+matches\s*=\s*(\[.*?\]);/s,
-        /let\s+matches\s*=\s*(\[.*?\]);/s,
-        /"matches"\s*:\s*(\[.*?\])/s,
-        /window\.matchData\s*=\s*(\[.*?\]);/s,
-        /window\.fixtures\s*=\s*(\[.*?\]);/s,
-      ];
+  private cleanHtmlContent(html: string): string {
+    return html
+      .replace(/<[^>]*>/g, ' ')  // Remove HTML tags
+      .replace(/&nbsp;/g, ' ')   // Replace &nbsp; with space
+      .replace(/&amp;/g, '&')   // Replace &amp; with &
+      .replace(/&lt;/g, '<')    // Replace &lt; with <
+      .replace(/&gt;/g, '>')    // Replace &gt; with >
+      .replace(/\s+/g, ' ')     // Replace multiple spaces with single space
+      .trim();
+  }
+
+  private extractTeamNames(cells: string[]): { home: string; away: string } | null {
+    // Look for cells containing team names (vs, -, etc.)
+    for (const cell of cells) {
+      const teamSeparators = [' vs ', ' v ', ' - ', ' x ', ' VS ', ' V ', ' X '];
       
-      for (const pattern of jsPatterns) {
-        const match = html.match(pattern);
-        if (match) {
-          try {
-            const data = JSON.parse(match[1]);
-            if (Array.isArray(data)) {
-              console.log(`Found ${data.length} matches in JavaScript data`);
-              return this.parseJavaScriptMatches(data);
-            }
-          } catch (e) {
-            console.warn('Failed to parse JavaScript match data:', e);
+      for (const separator of teamSeparators) {
+        if (cell.includes(separator)) {
+          const parts = cell.split(separator);
+          if (parts.length === 2) {
+            return {
+              home: parts[0].trim(),
+              away: parts[1].trim()
+            };
           }
         }
       }
       
-    } catch (error) {
-      console.error('Error extracting matches from JavaScript:', error);
+      // Also check for team names in separate cells
+      if (this.looksLikeTeamName(cell)) {
+        // Find the next cell that also looks like a team name
+        const cellIndex = cells.indexOf(cell);
+        for (let i = cellIndex + 1; i < cells.length; i++) {
+          if (this.looksLikeTeamName(cells[i])) {
+            return {
+              home: cell,
+              away: cells[i]
+            };
+          }
+        }
+      }
     }
     
-    return matches;
+    return null;
   }
 
-  private parseJavaScriptMatches(data: any[]): TotelepepMatch[] {
-    return data.map((item, index) => ({
-      id: `totelepep-js-${index}`,
-      homeTeam: item.homeTeam || item.home || item.team1 || 'Home Team',
-      awayTeam: item.awayTeam || item.away || item.team2 || 'Away Team',
-      league: item.league || item.competition || item.tournament || 'Football League',
-      kickoff: this.formatTime(item.time || item.kickoff || item.start),
-      date: this.formatDate(item.date || item.matchDate),
-      status: this.parseStatus(item.status || item.state) as 'upcoming' | 'live' | 'finished',
-      homeOdds: this.parseOdds(item.homeOdds || item.odds?.home || item.h),
-      drawOdds: this.parseOdds(item.drawOdds || item.odds?.draw || item.d),
-      awayOdds: this.parseOdds(item.awayOdds || item.odds?.away || item.a),
-      overUnder: {
-        over: this.parseOdds(item.overOdds || item.odds?.over || item.o25),
-        under: this.parseOdds(item.underOdds || item.odds?.under || item.u25),
-        line: 2.5,
-      },
-      bothTeamsScore: {
-        yes: this.parseOdds(item.bttsYes || item.odds?.bttsYes || item.gg),
-        no: this.parseOdds(item.bttsNo || item.odds?.bttsNo || item.ng),
-      },
-    }));
-  }
-
-  private looksLikeTeamNames(text: string): boolean {
-    // Check if text contains team name indicators
+  private looksLikeTeamName(text: string): boolean {
+    // Team name indicators
     const teamIndicators = [
-      'vs', 'v', '-', 'against', 'FC', 'United', 'City', 'Town', 'Rovers', 
-      'Wanderers', 'Athletic', 'SC', 'CF', 'AC', 'Real', 'Barcelona', 
-      'Madrid', 'Liverpool', 'Arsenal', 'Chelsea', 'Manchester', 'Tottenham'
+      'FC', 'United', 'City', 'Town', 'Rovers', 'Wanderers', 'Athletic', 
+      'SC', 'CF', 'AC', 'Real', 'Barcelona', 'Madrid', 'Liverpool', 
+      'Arsenal', 'Chelsea', 'Manchester', 'Tottenham', 'Bayern', 'Juventus'
     ];
     
-    return teamIndicators.some(indicator => 
-      text.toLowerCase().includes(indicator.toLowerCase())
-    ) && text.length > 5 && text.length < 100;
+    // Should be reasonable length and contain team indicators
+    return text.length > 2 && text.length < 50 && 
+           (teamIndicators.some(indicator => text.includes(indicator)) || 
+            /^[A-Za-z\s]+$/.test(text)); // Only letters and spaces
   }
 
-  private looksLikeTime(text: string): boolean {
-    return /^\d{1,2}:\d{2}$/.test(text.trim());
+  private extractTime(cells: string[]): string | null {
+    for (const cell of cells) {
+      // Look for time patterns (HH:MM)
+      const timeMatch = cell.match(/(\d{1,2}:\d{2})/);
+      if (timeMatch) {
+        return timeMatch[1];
+      }
+    }
+    return null;
   }
 
-  private looksLikeLeague(text: string): boolean {
+  private extractLeague(cells: string[]): string | null {
     const leagueIndicators = [
-      'League', 'Premier', 'Championship', 'Division', 'Cup', 'Liga', 
-      'Serie', 'Bundesliga', 'Ligue', 'Eredivisie'
+      'Premier League', 'Championship', 'League', 'Liga', 'Serie', 
+      'Bundesliga', 'Ligue', 'Eredivisie', 'Cup', 'Champions', 'Europa'
     ];
-    
-    return leagueIndicators.some(indicator => 
-      text.toLowerCase().includes(indicator.toLowerCase())
-    ) && text.length > 3 && text.length < 50;
-  }
-
-  private extractTeamNames(text: string): { home: string; away: string } | null {
-    // Try different separators
-    const separators = [' vs ', ' v ', ' - ', ' against ', ' VS ', ' V '];
-    
-    for (const separator of separators) {
-      if (text.includes(separator)) {
-        const parts = text.split(separator);
-        if (parts.length === 2) {
-          return {
-            home: parts[0].trim(),
-            away: parts[1].trim()
-          };
-        }
-      }
-    }
-    
-    return null;
-  }
-
-  private extractTeamNamesFromText(text: string): { home: string; away: string } | null {
-    // More flexible team name extraction from free text
-    const words = text.split(/\s+/);
-    
-    // Look for patterns like "TeamA vs TeamB" or "TeamA - TeamB"
-    for (let i = 0; i < words.length - 2; i++) {
-      if (['vs', 'v', '-', 'against'].includes(words[i].toLowerCase())) {
-        // Found separator, extract teams
-        const homeWords = words.slice(Math.max(0, i - 3), i);
-        const awayWords = words.slice(i + 1, Math.min(words.length, i + 4));
-        
-        if (homeWords.length > 0 && awayWords.length > 0) {
-          return {
-            home: homeWords.join(' ').trim(),
-            away: awayWords.join(' ').trim()
-          };
-        }
-      }
-    }
-    
-    return null;
-  }
-
-  private extractOddsFromCells(cells: string[]): any {
-    const odds: any = {};
-    
-    // Look for decimal numbers that could be odds (between 1.01 and 50.00)
-    const oddsPattern = /\b(\d{1,2}\.\d{2})\b/g;
-    const foundOdds: number[] = [];
     
     for (const cell of cells) {
-      let match;
-      while ((match = oddsPattern.exec(cell)) !== null) {
-        const odd = parseFloat(match[1]);
-        if (odd >= 1.01 && odd <= 50.00) {
-          foundOdds.push(odd);
+      if (leagueIndicators.some(indicator => 
+        cell.toLowerCase().includes(indicator.toLowerCase())
+      )) {
+        return cell;
+      }
+    }
+    return null;
+  }
+
+  private extractOdds(cells: string[]): any {
+    const odds: any = {};
+    const foundOdds: number[] = [];
+    
+    // Extract all decimal numbers that look like odds
+    for (const cell of cells) {
+      const oddsMatches = cell.match(/\b(\d{1,2}\.\d{2})\b/g);
+      if (oddsMatches) {
+        for (const oddStr of oddsMatches) {
+          const odd = parseFloat(oddStr);
+          if (odd >= 1.01 && odd <= 50.00) {
+            foundOdds.push(odd);
+          }
         }
       }
     }
     
-    // Assign odds based on typical order: Home, Draw, Away, Over, Under, BTTS Yes, BTTS No
+    // Assign odds in typical order: Home, Draw, Away, Over, Under, BTTS Yes, BTTS No
     if (foundOdds.length >= 3) {
       odds.home = foundOdds[0];
       odds.draw = foundOdds[1];
@@ -416,47 +323,177 @@ class TotelepepService {
     return odds;
   }
 
-  private extractOddsFromText(text: string): any {
-    const odds: any = {};
+  private extractFromDivContainers(html: string): TotelepepMatch[] {
+    const matches: TotelepepMatch[] = [];
     
-    // Extract all decimal numbers that look like odds
-    const oddsPattern = /\b(\d{1,2}\.\d{2})\b/g;
-    const foundOdds: number[] = [];
-    let match;
+    // Look for div containers that might contain match data
+    const divPatterns = [
+      /<div[^>]*class="[^"]*match[^"]*"[^>]*>(.*?)<\/div>/gis,
+      /<div[^>]*class="[^"]*fixture[^"]*"[^>]*>(.*?)<\/div>/gis,
+      /<div[^>]*class="[^"]*game[^"]*"[^>]*>(.*?)<\/div>/gis,
+      /<div[^>]*class="[^"]*event[^"]*"[^>]*>(.*?)<\/div>/gis
+    ];
     
-    while ((match = oddsPattern.exec(text)) !== null) {
-      const odd = parseFloat(match[1]);
-      if (odd >= 1.01 && odd <= 50.00) {
-        foundOdds.push(odd);
+    for (const pattern of divPatterns) {
+      const divMatches = html.match(pattern) || [];
+      console.log(`🔍 Found ${divMatches.length} div containers with pattern`);
+      
+      for (let i = 0; i < divMatches.length; i++) {
+        const match = this.extractMatchFromDiv(divMatches[i], `div-${i}`);
+        if (match) {
+          matches.push(match);
+        }
       }
     }
     
-    // Assign first few odds to main markets
+    return matches;
+  }
+
+  private extractMatchFromDiv(divContent: string, id: string): TotelepepMatch | null {
+    const textContent = this.cleanHtmlContent(divContent);
+    
+    // Extract team names
+    const teamInfo = this.extractTeamNamesFromText(textContent);
+    if (!teamInfo) {
+      return null;
+    }
+    
+    // Extract time
+    const timeMatch = textContent.match(/(\d{1,2}:\d{2})/);
+    const matchTime = timeMatch ? timeMatch[1] : null;
+    
+    // Extract odds
+    const odds = this.extractOddsFromText(textContent);
+    
+    return {
+      id,
+      homeTeam: teamInfo.home,
+      awayTeam: teamInfo.away,
+      league: 'Football League',
+      kickoff: matchTime || this.generateTime(),
+      date: this.getTodayDate(),
+      status: 'upcoming' as const,
+      homeOdds: odds.home || 2.50,
+      drawOdds: odds.draw || 3.20,
+      awayOdds: odds.away || 2.80,
+      overUnder: {
+        over: odds.over || 1.90,
+        under: odds.under || 1.90,
+        line: 2.5,
+      },
+      bothTeamsScore: {
+        yes: odds.bttsYes || 1.80,
+        no: odds.bttsNo || 2.00,
+      },
+    };
+  }
+
+  private extractTeamNamesFromText(text: string): { home: string; away: string } | null {
+    const separators = [' vs ', ' v ', ' - ', ' x ', ' VS ', ' V ', ' X ', ' against '];
+    
+    for (const separator of separators) {
+      if (text.includes(separator)) {
+        const parts = text.split(separator);
+        if (parts.length >= 2) {
+          return {
+            home: parts[0].trim(),
+            away: parts[1].trim()
+          };
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  private extractOddsFromText(text: string): any {
+    const odds: any = {};
+    const foundOdds: number[] = [];
+    
+    const oddsMatches = text.match(/\b(\d{1,2}\.\d{2})\b/g);
+    if (oddsMatches) {
+      for (const oddStr of oddsMatches) {
+        const odd = parseFloat(oddStr);
+        if (odd >= 1.01 && odd <= 50.00) {
+          foundOdds.push(odd);
+        }
+      }
+    }
+    
     if (foundOdds.length >= 3) {
       odds.home = foundOdds[0];
       odds.draw = foundOdds[1];
       odds.away = foundOdds[2];
     }
     
-    if (foundOdds.length >= 5) {
-      odds.over = foundOdds[3];
-      odds.under = foundOdds[4];
+    return odds;
+  }
+
+  private extractFromJavaScript(html: string): TotelepepMatch[] {
+    const matches: TotelepepMatch[] = [];
+    
+    // Look for JavaScript variables containing match data
+    const jsPatterns = [
+      /var\s+matches\s*=\s*(\[.*?\]);/s,
+      /const\s+matches\s*=\s*(\[.*?\]);/s,
+      /let\s+matches\s*=\s*(\[.*?\]);/s,
+      /"matches"\s*:\s*(\[.*?\])/s,
+      /window\.matchData\s*=\s*(\[.*?\]);/s,
+      /window\.fixtures\s*=\s*(\[.*?\]);/s,
+      /matchData\s*=\s*(\[.*?\]);/s
+    ];
+    
+    for (const pattern of jsPatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        try {
+          const data = JSON.parse(match[1]);
+          if (Array.isArray(data)) {
+            console.log(`📊 Found ${data.length} matches in JavaScript data`);
+            const jsMatches = this.parseJavaScriptMatches(data);
+            matches.push(...jsMatches);
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to parse JavaScript match data:', e);
+        }
+      }
     }
     
-    return odds;
+    return matches;
+  }
+
+  private parseJavaScriptMatches(data: any[]): TotelepepMatch[] {
+    return data.map((item, index) => ({
+      id: `js-${index}`,
+      homeTeam: item.homeTeam || item.home || item.team1 || 'Home Team',
+      awayTeam: item.awayTeam || item.away || item.team2 || 'Away Team',
+      league: item.league || item.competition || item.tournament || 'Football League',
+      kickoff: this.formatTime(item.time || item.kickoff || item.start),
+      date: this.formatDate(item.date || item.matchDate),
+      status: this.parseStatus(item.status || item.state) as 'upcoming' | 'live' | 'finished',
+      homeOdds: this.parseOdds(item.homeOdds || item.odds?.home),
+      drawOdds: this.parseOdds(item.drawOdds || item.odds?.draw),
+      awayOdds: this.parseOdds(item.awayOdds || item.odds?.away),
+      overUnder: {
+        over: this.parseOdds(item.overOdds || item.odds?.over),
+        under: this.parseOdds(item.underOdds || item.odds?.under),
+        line: 2.5,
+      },
+      bothTeamsScore: {
+        yes: this.parseOdds(item.bttsYes || item.odds?.bttsYes),
+        no: this.parseOdds(item.bttsNo || item.odds?.bttsNo),
+      },
+    }));
   }
 
   private parseStatus(status: string): string {
     if (!status) return 'upcoming';
     
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('live') || statusLower.includes('playing') || 
-        statusLower.includes('1h') || statusLower.includes('2h') ||
-        statusLower.includes('ht') || statusLower.includes('45')) {
+    if (statusLower.includes('live') || statusLower.includes('playing')) {
       return 'live';
     }
-    if (statusLower.includes('finished') || statusLower.includes('ended') || 
-        statusLower.includes('ft') || statusLower.includes('full')) {
+    if (statusLower.includes('finished') || statusLower.includes('ended')) {
       return 'finished';
     }
     return 'upcoming';
@@ -466,42 +503,26 @@ class TotelepepService {
     if (typeof odds === 'number') return Math.max(odds, 1.01);
     if (typeof odds === 'string') {
       const parsed = parseFloat(odds);
-      return isNaN(parsed) ? this.generateRealisticOdds() : Math.max(parsed, 1.01);
+      return isNaN(parsed) ? 2.00 : Math.max(parsed, 1.01);
     }
-    return this.generateRealisticOdds();
-  }
-
-  private generateRealisticOdds(): number {
-    // Generate realistic odds between 1.20 and 5.00
-    return Math.round((1.20 + Math.random() * 3.80) * 100) / 100;
-  }
-
-  private generateRandomTime(): string {
-    const hour = Math.floor(Math.random() * 12) + 12; // 12-23
-    const minute = Math.floor(Math.random() * 4) * 15; // 0, 15, 30, 45
-    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-  }
-
-  private getTodayDate(): string {
-    return new Date().toISOString().split('T')[0];
+    return 2.00;
   }
 
   private formatTime(time: any): string {
-    if (!time) {
-      return this.generateRandomTime();
-    }
+    if (!time) return this.generateTime();
     
     if (typeof time === 'string') {
       const timeMatch = time.match(/(\d{1,2}:\d{2})/);
-      if (timeMatch) {
-        return timeMatch[1];
-      }
+      if (timeMatch) return timeMatch[1];
     }
     
     try {
-      return new Date(time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      return new Date(time).toLocaleTimeString('en-GB', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
     } catch {
-      return this.generateRandomTime();
+      return this.generateTime();
     }
   }
 
@@ -515,66 +536,14 @@ class TotelepepService {
     }
   }
 
-  private generateSampleMatches(): TotelepepMatch[] {
-    const leagues = [
-      'Premier League', 'Championship', 'League One', 'League Two',
-      'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Eredivisie'
-    ];
-    
-    const teams = [
-      'Manchester United', 'Liverpool', 'Arsenal', 'Chelsea', 'Manchester City',
-      'Tottenham', 'Newcastle', 'Brighton', 'West Ham', 'Aston Villa',
-      'Barcelona', 'Real Madrid', 'Atletico Madrid', 'Valencia', 'Sevilla',
-      'Juventus', 'AC Milan', 'Inter Milan', 'Napoli', 'Roma',
-      'Bayern Munich', 'Borussia Dortmund', 'RB Leipzig', 'Bayer Leverkusen',
-      'PSG', 'Marseille', 'Lyon', 'Monaco', 'Ajax', 'PSV'
-    ];
-    
-    const matches: TotelepepMatch[] = [];
-    const today = new Date();
-    
-    // Generate 50 sample matches
-    for (let i = 0; i < 50; i++) {
-      const homeTeam = teams[Math.floor(Math.random() * teams.length)];
-      let awayTeam = teams[Math.floor(Math.random() * teams.length)];
-      
-      // Ensure different teams
-      while (awayTeam === homeTeam) {
-        awayTeam = teams[Math.floor(Math.random() * teams.length)];
-      }
-      
-      const league = leagues[Math.floor(Math.random() * leagues.length)];
-      
-      // Generate match date (today to next 7 days)
-      const matchDate = new Date(today);
-      matchDate.setDate(today.getDate() + Math.floor(Math.random() * 8));
-      
-      const match: TotelepepMatch = {
-        id: `sample-${i}`,
-        homeTeam,
-        awayTeam,
-        league,
-        kickoff: this.generateRandomTime(),
-        date: matchDate.toISOString().split('T')[0],
-        status: 'upcoming' as const,
-        homeOdds: this.generateRealisticOdds(),
-        drawOdds: this.generateRealisticOdds(),
-        awayOdds: this.generateRealisticOdds(),
-        overUnder: {
-          over: this.generateRealisticOdds(),
-          under: this.generateRealisticOdds(),
-          line: 2.5,
-        },
-        bothTeamsScore: {
-          yes: this.generateRealisticOdds(),
-          no: this.generateRealisticOdds(),
-        },
-      };
-      
-      matches.push(match);
-    }
-    
-    return matches;
+  private generateTime(): string {
+    const hour = Math.floor(Math.random() * 12) + 12; // 12-23
+    const minute = Math.floor(Math.random() * 4) * 15; // 0, 15, 30, 45
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  }
+
+  private getTodayDate(): string {
+    return new Date().toISOString().split('T')[0];
   }
 
   // Sort matches by date and time
@@ -601,11 +570,6 @@ class TotelepepService {
     });
     
     return grouped;
-  }
-
-  async placeBet(matchId: string, betType: string, amount: number): Promise<boolean> {
-    console.log('Simulating bet placement with Totelepep - Minimum stake: MUR 50');
-    return true;
   }
 }
 
