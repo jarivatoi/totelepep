@@ -73,7 +73,7 @@ class MatchSpecificExtractor {
 
   private parseNameValueResponse(data: any, matchId: string): MatchOddsData | null {
     try {
-      console.log(`🔧 Parsing Name/Value response for match ${matchId}...`);
+      console.log(`🔧 Parsing markets response for match ${matchId}...`);
       console.log(`📄 Response structure:`, JSON.stringify(data, null, 2));
 
       const oddsData: MatchOddsData = { matchId };

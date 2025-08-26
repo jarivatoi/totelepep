@@ -252,14 +252,29 @@ const MatchSpecificTester: React.FC = () => {
                 </ul>
               </div>
             )}
+            
+            {/* Market Analysis Summary */}
+            {results.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 className="font-semibold text-yellow-800 mb-2">
+                  📊 Market Analysis Summary:
+                </h3>
+                <div className="text-sm text-yellow-700 space-y-1">
+                  <p><strong>Key Finding:</strong> API only returns 1X2 markets (CP code)</p>
+                  <p><strong>Missing Markets:</strong> BTTS and Over/Under markets not included</p>
+                  <p><strong>Market Counts:</strong> {results.map(r => `Match ${r.matchId}: ${r.data?.additionalOdds ? Object.keys(r.data.additionalOdds).length : 0} markets`).join(', ')}</p>
+                  <p><strong>Next Steps:</strong> Need to find endpoint parameters that return all market types</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         <div className="text-xs text-gray-500 space-y-1">
           <p>• Tests the Power Query GetMatch endpoint for individual matches</p>
-          <p>• Extracts BTTS and Over/Under odds from Name/Value table structure</p>
+          <p>• Analyzes market structure and identifies missing BTTS/Over-Under markets</p>
           <p>• Includes 1.5-second delay between requests for rate limiting</p>
-          <p>• Tests matches from different competitions (Austria Cup, EFL Cup, Champions League, etc.)</p>
+          <p>• Shows market count discrepancies to identify missing data</p>
         </div>
       </div>
     </div>
