@@ -26,7 +26,6 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [parlaySelections, setParlaySelections] = useState<ParlaySelection[]>([]);
-  const [showParlay, setShowParlay] = useState(false);
   const [showExtractor, setShowExtractor] = useState(false);
   const [showEndpointDiscovery, setShowEndpointDiscovery] = useState(false);
   const [showResponseAnalyzer, setShowResponseAnalyzer] = useState(false);
@@ -137,7 +136,6 @@ function App() {
           kickoff: match.kickoff,
         };
         setParlaySelections(prev => [...prev, newSelection]);
-        setShowParlay(true); // Always show parlay when adding selections
       }
     }
   };
@@ -148,14 +146,10 @@ function App() {
 
   const handleRemoveSelectionByMatch = (matchId: string) => {
     setParlaySelections(prev => prev.filter(s => s.matchId !== matchId));
-    if (parlaySelections.length <= 1) {
-      setShowParlay(false);
-    }
   };
 
   const handleClearAll = () => {
     setParlaySelections([]);
-    setShowParlay(false);
   };
   const handleDataExtracted = (extractedData: any[]) => {
     // Convert extracted data to TotelepepMatch format
@@ -269,7 +263,12 @@ function App() {
             <div className="flex flex-col sm:flex-row gap-4">
               {parlaySelections.length > 0 && (
                 <button
-                  onClick={() => setShowParlay(!showParlay)}
+                  onClick={() => {
+                    const parlayElement = document.querySelector('.lg\\:w-96');
+                    if (parlayElement) {
+                      parlayElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"
                 >
                   <Calculator className="w-4 h-4" />
@@ -376,7 +375,7 @@ function App() {
         />
           </div>
           
-          {showParlay && (
+          {parlaySelections.length > 0 && (
             <div className="lg:w-96">
               <div className="sticky top-4">
               <ParlayBuilder
