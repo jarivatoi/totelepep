@@ -40,7 +40,7 @@ const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) =
       formData.append(`data[SingleBets][${index}][competitionId]`, marketData.competitionId);
       formData.append(`data[SingleBets][${index}][marketId]`, selection.matchId);
       formData.append(`data[SingleBets][${index}][marketBookNo]`, marketData.marketBookNo);
-      formData.append(`data[SingleBets][${index}][marketCode]`, 'CP'); // 1X2 market code
+      formData.append(`data[SingleBets][${index}][marketCode]`, marketData.marketCode);
       formData.append(`data[SingleBets][${index}][marketLine]`, '');
       formData.append(`data[SingleBets][${index}][marketIsLive]`, '0');
       formData.append(`data[SingleBets][${index}][marketIsRacing]`, '0');
@@ -126,13 +126,15 @@ const extractMarketData = (selection: ParlaySelection) => {
   const competitionId = selection.competitionId || '52'; // Default to Japan Emperor Cup
   const league = selection.league || 'Football League';
   
-  // Use consistent marketBookNo for 1X2 markets based on successful test cases
-  const marketBookNo = competitionId === '52' ? '93605' : '76713';
+  // Use the actual marketBookNo and marketCode from the match data
+  const marketBookNo = selection.marketBookNo || (competitionId === '52' ? '93605' : '76713');
+  const marketCode = selection.marketCode || 'CP';
   
   return {
     competitionName: league,
     competitionId,
-    marketBookNo
+    marketBookNo,
+    marketCode
   };
 };
 
@@ -193,6 +195,8 @@ export interface ParlaySelection {
   league?: string;
   kickoff?: string;
 }
+  marketBookNo?: string;
+  marketCode?: string;
 
 interface ParlayBuilderProps {
   selections: ParlaySelection[];

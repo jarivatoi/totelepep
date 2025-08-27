@@ -135,6 +135,8 @@ function App() {
           league: match.league,
           kickoff: match.kickoff,
           competitionId: match.competitionId,
+          marketBookNo: match.marketBookNo,
+          marketCode: match.marketCode,
         };
         setParlaySelections(prev => [...prev, newSelection]);
       }

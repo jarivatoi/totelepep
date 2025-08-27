@@ -4,6 +4,8 @@ interface TotelepepMatch {
   awayTeam: string;
   league: string;
   competitionId: string;
+  marketBookNo?: string;
+  marketCode?: string;
   kickoff: string;
   date: string;
   status: 'upcoming' | 'live' | 'finished';
@@ -278,6 +280,8 @@ class TotelepepExtractor {
       
       // Get competition name from competitionData if available
       const competitionId = fields[1];
+      const marketBookNo = fields[15]; // Extract marketBookNo from field 15
+      const marketCode = fields[16]; // Extract marketCode from field 16
       const league = this.getLeagueFromCompetitionId(competitionId) || 'Football League';
       
       const match: TotelepepMatch = {
@@ -286,6 +290,8 @@ class TotelepepExtractor {
         awayTeam: teamNames.away,
         league,
         competitionId,
+        marketBookNo,
+        marketCode,
         kickoff: time,
         date,
         status: 'upcoming' as const,
