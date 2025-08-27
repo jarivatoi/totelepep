@@ -160,6 +160,13 @@ const ParlayBuilder: React.FC<ParlayBuilderProps> = ({
 }) => {
   const [betAmount, setBetAmount] = useState<number>(50);
   const [isPlacing, setIsPlacing] = useState(false);
+  const [lastResult, setLastResult] = useState<{
+    success: boolean;
+    message: string;
+    ticketNo?: string;
+    potentialPayout?: string;
+    fullResponse?: any;
+  } | null>(null);
 
   const totalOdds = selections.reduce((acc, selection) => acc * selection.odds, 1);
   const potentialPayout = betAmount * totalOdds;
@@ -170,13 +177,21 @@ const ParlayBuilder: React.FC<ParlayBuilderProps> = ({
     console.log('💰 Bet amount:', betAmount);
     console.log('📈 Total odds:', totalOdds);
 
+    // Clear previous result
+    setLastResult(null);
     if (selections.length === 0) {
-      alert('Please add at least one selection to your parlay');
+      setLastResult({
+        success: false,
+        message: 'Please add at least one selection to your parlay'
+      });
       return;
     }
 
     if (betAmount < 50) {
-      alert('Minimum stake is MUR 50');
+      setLastResult({
+        success: false,
+        message: 'Minimum stake is MUR 50'
+      });
       return;
     }
 
@@ -188,22 +203,38 @@ const ParlayBuilder: React.FC<ParlayBuilderProps> = ({
       // Use real Totelepep booking API
       const bookingResult = await placeTotelepepBet(selections, betAmount);
       
+      console.log('📄 Full Totelepep response:', bookingResult);
+      
       if (bookingResult.success && bookingResult.ticketNo) {
         console.log('✅ Totelepep booking successful:', bookingResult);
         
-        alert(`Booking successful!\nTicket Number: ${bookingResult.ticketNo}\nPotential Payout: MUR ${bookingResult.potentialPayout}`);
+        setLastResult({
+          success: true,
+          message: 'Booking successful!',
+          ticketNo: bookingResult.ticketNo,
+          potentialPayout: bookingResult.potentialPayout,
+          fullResponse: bookingResult
+        });
         
         // Clear selections after successful booking
         onClearAll();
         setBetAmount(50);
       } else {
         console.error('❌ Totelepep booking failed:', bookingResult);
-        alert(`Booking failed: ${bookingResult.errorMessage || 'Please try again'}`);
+        setLastResult({
+          success: false,
+          message: `Booking failed: ${bookingResult.errorMessage || 'Please try again'}`,
+          fullResponse: bookingResult
+        });
       }
       
     } catch (error) {
       console.error('❌ Error placing Totelepep bet:', error);
-      alert('Failed to connect to Totelepep. Please try again.');
+      setLastResult({
+        success: false,
+        message: `Failed to connect to Totelepep: ${error instanceof Error ? error.message : 'Please try again'}`,
+        fullResponse: { error: error instanceof Error ? error.message : 'Unknown error' }
+      });
     } finally {
       setIsPlacing(false);
     }
