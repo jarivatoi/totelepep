@@ -1,12 +1,150 @@
 import React, { useState } from 'react';
 import { Trash2, Calculator, DollarSign } from 'lucide-react';
 
+// Totelepep betting API integration
+const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) => {
+  try {
+    // Build the form data in Totelepep's exact format
+    const formData = new URLSearchParams();
+    
+    // Multi-bet data (empty for single bets)
+    formData.append('data[MultiStake]', '');
+    
+    // Add each selection as SingleBets array
+    selections.forEach((selection, index) => {
+      // Generate betRef (format: matchId-optionNo)
+      const betRef = `${selection.matchId}-1`;
+      
+      // Map selection type to option details
+      const optionDetails = getOptionDetails(selection);
+      
+      formData.append(`data[SingleBets][${index}][betRef]`, betRef);
+      formData.append(`data[SingleBets][${index}][isRacing]`, 'false');
+      formData.append(`data[SingleBets][${index}][legNo]`, '1');
+      formData.append(`data[SingleBets][${index}][matchName]`, `${selection.homeTeam} v ${selection.awayTeam}`);
+      formData.append(`data[SingleBets][${index}][matchStartTime]`, selection.kickoff || '15:00');
+      formData.append(`data[SingleBets][${index}][matchRunTime]`, '0');
+      formData.append(`data[SingleBets][${index}][optionNo]`, optionDetails.optionNo);
+      formData.append(`data[SingleBets][${index}][optionCode]`, optionDetails.optionCode);
+      formData.append(`data[SingleBets][${index}][optionName]`, optionDetails.optionName);
+      formData.append(`data[SingleBets][${index}][optionOdd]`, selection.odds.toString());
+      formData.append(`data[SingleBets][${index}][optionPreviousOdd]`, selection.odds.toString());
+      formData.append(`data[SingleBets][${index}][sportName]`, 'Soccer');
+      formData.append(`data[SingleBets][${index}][sportIcon]`, 'soccer_icn');
+      formData.append(`data[SingleBets][${index}][competitionName]`, selection.league || 'Football League');
+      formData.append(`data[SingleBets][${index}][competitionId]`, '52'); // Default competition ID
+      formData.append(`data[SingleBets][${index}][marketId]`, selection.matchId);
+      formData.append(`data[SingleBets][${index}][marketBookNo]`, '93605'); // Default market book number
+      formData.append(`data[SingleBets][${index}][marketCode]`, 'CP'); // 1X2 market code
+      formData.append(`data[SingleBets][${index}][marketLine]`, '');
+      formData.append(`data[SingleBets][${index}][marketIsLive]`, '0');
+      formData.append(`data[SingleBets][${index}][marketIsRacing]`, '0');
+      formData.append(`data[SingleBets][${index}][marketPeriodCode]`, 'FT');
+      formData.append(`data[SingleBets][${index}][marketDisplayName]`, '1 X 2');
+      formData.append(`data[SingleBets][${index}][stake]`, stake.toString());
+      formData.append(`data[SingleBets][${index}][returnAmount]`, (stake * selection.odds).toFixed(2));
+      formData.append(`data[SingleBets][${index}][potentialPayout]`, '');
+      formData.append(`data[SingleBets][${index}][ticketNo]`, '');
+      formData.append(`data[SingleBets][${index}][taxAmount]`, '');
+      formData.append(`data[SingleBets][${index}][rebatePercentage]`, '0');
+      formData.append(`data[SingleBets][${index}][rebateAmount]`, '');
+      formData.append(`data[SingleBets][${index}][bonusPercentage]`, '0');
+      formData.append(`data[SingleBets][${index}][bonusAmount]`, '');
+      formData.append(`data[SingleBets][${index}][betErrorCode]`, '0');
+      formData.append(`data[SingleBets][${index}][betErrorMessage]`, 'null');
+      formData.append(`data[SingleBets][${index}][legErrorCode]`, '0');
+      formData.append(`data[SingleBets][${index}][legErrorMessage]`, 'None');
+      formData.append(`data[SingleBets][${index}][meetingId]`, '0');
+      formData.append(`data[SingleBets][${index}][raceId]`, '0');
+      formData.append(`data[SingleBets][${index}][raceNo]`, '');
+      formData.append(`data[SingleBets][${index}][runnerNo]`, '');
+      formData.append(`data[SingleBets][${index}][runnerName]`, '');
+      formData.append(`data[SingleBets][${index}][barrierNo]`, '0');
+      formData.append(`data[SingleBets][${index}][racingName]`, '');
+      formData.append(`data[SingleBets][${index}][priceTag]`, '');
+      formData.append(`data[SingleBets][${index}][market]`, '');
+    });
+    
+    // Proxy bet flag
+    formData.append('data[ProxyBet]', '0');
+    
+    console.log('📡 Sending Totelepep bet request:', formData.toString());
+    
+    const response = await fetch('/api/webapi/placebet', {
+      method: 'POST',
+      headers: {
+        'Accept': '*/*',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData,
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log('📄 Totelepep response:', result);
+    
+    return {
+      success: !result.errorMessage || result.ticketNo,
+      ticketNo: result.ticketNo,
+      potentialPayout: result.potentialPayout,
+      errorMessage: result.errorMessage,
+      multiErrorMessage: result.multiErrorMessage,
+      balanceAmount: result.balanceAmount,
+      betList: result.betList
+    };
+    
+  } catch (error) {
+    console.error('❌ Totelepep API error:', error);
+    return {
+      success: false,
+      errorMessage: error instanceof Error ? error.message : 'Network error'
+    };
+  }
+};
+
+// Map selection types to Totelepep option format
+const getOptionDetails = (selection: ParlaySelection) => {
+  switch (selection.priceType) {
+    case 'home':
+      return {
+        optionNo: '1',
+        optionCode: 'H',
+        optionName: selection.homeTeam
+      };
+    case 'draw':
+      return {
+        optionNo: '2',
+        optionCode: 'D',
+        optionName: 'Draw'
+      };
+    case 'away':
+      return {
+        optionNo: '3',
+        optionCode: 'A',
+        optionName: selection.awayTeam
+      };
+    default:
+      return {
+        optionNo: '1',
+        optionCode: 'H',
+        optionName: selection.homeTeam
+      };
+  }
+};
+
 export interface ParlaySelection {
   matchId: string;
   homeTeam: string;
   awayTeam: string;
-  selection: string;
+  priceType: string;
   odds: number;
+  league?: string;
+  kickoff?: string;
 }
 
 interface ParlayBuilderProps {
@@ -47,36 +185,25 @@ const ParlayBuilder: React.FC<ParlayBuilderProps> = ({
     try {
       console.log('🚀 Attempting to place bet...');
       
-      // Simulate API call for now
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Use real Totelepep booking API
+      const bookingResult = await placeTotelepepBet(selections, betAmount);
       
-      const ticket = {
-        ticketId: `TICKET-${Date.now()}`,
-        betAmount,
-        totalOdds: Math.round(totalOdds * 100) / 100,
-        potentialPayout: Math.round(potentialPayout * 100) / 100,
-        selections: selections.map(sel => ({
-          matchId: sel.matchId,
-          homeTeam: sel.homeTeam,
-          awayTeam: sel.awayTeam,
-          selection: sel.selection,
-          odds: sel.odds,
-        })),
-        timestamp: new Date().toISOString(),
-        status: 'pending' as const,
-      };
-
-      console.log('✅ Bet placed successfully:', ticket);
-      
-      alert(`Bet placed successfully!\nTicket ID: ${ticket.ticketId}\nPotential Payout: MUR ${ticket.potentialPayout.toFixed(2)}`);
-      
-      // Clear selections after successful bet
-      onClearAll();
-      setBetAmount(50);
+      if (bookingResult.success && bookingResult.ticketNo) {
+        console.log('✅ Totelepep booking successful:', bookingResult);
+        
+        alert(`Booking successful!\nTicket Number: ${bookingResult.ticketNo}\nPotential Payout: MUR ${bookingResult.potentialPayout}`);
+        
+        // Clear selections after successful booking
+        onClearAll();
+        setBetAmount(50);
+      } else {
+        console.error('❌ Totelepep booking failed:', bookingResult);
+        alert(`Booking failed: ${bookingResult.errorMessage || 'Please try again'}`);
+      }
       
     } catch (error) {
-      console.error('❌ Error placing bet:', error);
-      alert('Failed to place bet. Please try again.');
+      console.error('❌ Error placing Totelepep bet:', error);
+      alert('Failed to connect to Totelepep. Please try again.');
     } finally {
       setIsPlacing(false);
     }
