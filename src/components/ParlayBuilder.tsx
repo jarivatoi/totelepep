@@ -194,9 +194,10 @@ export interface ParlaySelection {
   odds: number;
   league?: string;
   kickoff?: string;
-}
   marketBookNo?: string;
   marketCode?: string;
+  competitionId?: string;
+}
 
 interface ParlayBuilderProps {
   selections: ParlaySelection[];
