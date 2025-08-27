@@ -13,6 +13,7 @@ import ResponseAnalyzer from './components/ResponseAnalyzer';
 import AlternativeSolutions from './components/AlternativeSolutions';
 import MatchSpecificTester from './components/MatchSpecificTester';
 import BetPlacementAnalyzer from './components/BetPlacementAnalyzer';
+import BookingDiscoveryGuide from './components/BookingDiscoveryGuide';
 import { totelepepService, TotelepepMatch } from './services/totelepepService';
 import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
 import { usePWA } from './hooks/usePWA';
@@ -32,6 +33,7 @@ function App() {
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [showMatchTester, setShowMatchTester] = useState(false);
   const [showBetAnalyzer, setShowBetAnalyzer] = useState(false);
+  const [showBookingGuide, setShowBookingGuide] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   const { isOnline } = usePWA();
@@ -238,6 +240,13 @@ function App() {
                   <Ticket className="w-4 h-4" />
                   {showBetAnalyzer ? 'Hide' : 'Show'} Bet Placement Analyzer
                 </button>
+                <button
+                  onClick={() => setShowBookingGuide(!showBookingGuide)}
+                  className="flex items-center gap-2 text-purple-600 hover:text-purple-800 text-sm font-medium"
+                >
+                  <Search className="w-4 h-4" />
+                  {showBookingGuide ? 'Hide' : 'Show'} Booking Discovery Guide
+                </button>
               </div>
               <p className="text-gray-600">
                 Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} {!isOnline && '(Offline)'}
@@ -329,6 +338,10 @@ function App() {
           
           {showBetAnalyzer && (
             <BetPlacementAnalyzer />
+          )}
+          
+          {showBookingGuide && (
+            <BookingDiscoveryGuide />
           )}
           
           {searchTerm && (
