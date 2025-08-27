@@ -146,6 +146,13 @@ function App() {
     setParlaySelections(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleRemoveSelectionByMatch = (matchId: string) => {
+    setParlaySelections(prev => prev.filter(s => s.matchId !== matchId));
+    if (parlaySelections.length <= 1) {
+      setShowParlay(false);
+    }
+  };
+
   const handleClearAll = () => {
     setParlaySelections([]);
     setShowParlay(false);
@@ -373,7 +380,7 @@ function App() {
             <div className="lg:w-96">
               <ParlayBuilder
                 selections={parlaySelections}
-                onRemoveSelection={handleRemoveSelection}
+                onRemoveSelection={handleRemoveSelectionByMatch}
                 onClearAll={handleClearAll}
               />
             </div>

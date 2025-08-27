@@ -254,7 +254,19 @@ const ParlayBuilder: React.FC<ParlayBuilderProps> = ({
           >
             <div className="flex-1">
               <div className="font-medium text-gray-800">
-                {selection.homeTeam} vs {selection.awayTeam}
+               <div className="text-sm text-gray-600">
+                 {selection.priceType === 'home' ? selection.homeTeam : 
+                  selection.priceType === 'draw' ? 'Draw' : 
+                  selection.priceType === 'away' ? selection.awayTeam :
+                  selection.priceType === 'over' ? 'Over 2.5' :
+                  selection.priceType === 'under' ? 'Under 2.5' :
+                  selection.priceType === 'btts_yes' ? 'Both Teams to Score - Yes' :
+                  selection.priceType === 'btts_no' ? 'Both Teams to Score - No' :
+                  selection.priceType}
+               </div>
+               <div className="text-xs text-gray-500">
+                 {selection.league} • {selection.kickoff}
+               </div>
               </div>
               <div className="text-sm text-gray-600">{selection.selection}</div>
             </div>
