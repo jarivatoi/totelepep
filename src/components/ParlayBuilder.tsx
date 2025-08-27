@@ -284,27 +284,34 @@ const ParlayBuilder: React.FC<ParlayBuilderProps> = ({
       </div>
 
       <div className="border-t pt-4">
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Stake Amount (MUR)
-            </label>
-            <input
-              type="number"
-              min="50"
-              step="10"
-              value={betAmount}
-              onChange={(e) => setBetAmount(Math.max(50, parseInt(e.target.value) || 50))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Minimum: MUR 50</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Odds
-            </label>
-            <div className="px-3 py-2 bg-gray-100 rounded-md font-bold text-lg text-blue-600">
-              {totalOdds.toFixed(2)}
+        {/* Prominent Stake Input */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <label className="block text-lg font-bold text-gray-800 mb-3">
+            💰 Enter Your Stake Amount
+          </label>
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 font-medium">
+                  MUR
+                </span>
+                <input
+                  type="number"
+                  min="50"
+                  step="10"
+                  value={betAmount}
+                  onChange={(e) => setBetAmount(Math.max(50, parseInt(e.target.value) || 50))}
+                  className="w-full pl-16 pr-4 py-3 text-xl font-bold border-2 border-yellow-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                  placeholder="50"
+                />
+              </div>
+              <p className="text-sm text-yellow-700 mt-2">Minimum stake: MUR 50</p>
+            </div>
+            <div className="text-center">
+              <div className="text-sm text-gray-600 mb-1">Total Odds</div>
+              <div className="text-2xl font-bold text-blue-600 bg-white px-4 py-2 rounded-lg border">
+                {totalOdds.toFixed(2)}
+              </div>
             </div>
           </div>
         </div>

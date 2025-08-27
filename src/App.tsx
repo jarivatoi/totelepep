@@ -137,7 +137,7 @@ function App() {
           kickoff: match.kickoff,
         };
         setParlaySelections(prev => [...prev, newSelection]);
-        setShowParlay(true);
+        setShowParlay(true); // Always show parlay when adding selections
       }
     }
   };
@@ -378,11 +378,13 @@ function App() {
           
           {showParlay && (
             <div className="lg:w-96">
+              <div className="sticky top-4">
               <ParlayBuilder
                 selections={parlaySelections}
                 onRemoveSelection={handleRemoveSelectionByMatch}
                 onClearAll={handleClearAll}
               />
+              </div>
             </div>
           )}
         </div>
