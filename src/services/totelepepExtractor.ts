@@ -3,6 +3,7 @@ interface TotelepepMatch {
   homeTeam: string;
   awayTeam: string;
   league: string;
+  competitionId: string;
   kickoff: string;
   date: string;
   status: 'upcoming' | 'live' | 'finished';
@@ -284,6 +285,7 @@ class TotelepepExtractor {
         homeTeam: teamNames.home,
         awayTeam: teamNames.away,
         league,
+        competitionId,
         kickoff: time,
         date,
         status: 'upcoming' as const,

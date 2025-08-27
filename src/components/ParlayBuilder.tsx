@@ -122,35 +122,17 @@ const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) =
 
 // Extract market data based on match and league
 const extractMarketData = (selection: ParlaySelection) => {
-  // Map leagues to competition IDs and market book numbers
-  const leagueMapping: Record<string, { competitionId: string; marketBookNo: string }> = {
-    'Japan - Emperor Cup': { competitionId: '52', marketBookNo: '93605' },
-    'Austria - OFB Cup': { competitionId: '81', marketBookNo: '76713' },
-    'England - EFL Cup': { competitionId: '126', marketBookNo: '76713' },
-    'Spain - LaLiga': { competitionId: '163', marketBookNo: '76713' },
-    'UEFA Champions League': { competitionId: '50', marketBookNo: '76713' },
-    'UEFA Conference League': { competitionId: '55', marketBookNo: '76713' },
-    'UEFA Europa League': { competitionId: '135', marketBookNo: '76713' },
-    'Lithuania - A Lyga': { competitionId: '38', marketBookNo: '76713' },
-    'Czechia - Czech Cup': { competitionId: '112', marketBookNo: '76713' },
-  };
-  
+  // Use the actual competitionId from the match data
+  const competitionId = selection.competitionId || '52'; // Default to Japan Emperor Cup
   const league = selection.league || 'Football League';
-  const mapping = leagueMapping[league];
   
-  if (mapping) {
-    return {
-      competitionName: league,
-      competitionId: mapping.competitionId,
-      marketBookNo: mapping.marketBookNo
-    };
-  }
+  // Use consistent marketBookNo for 1X2 markets based on successful test cases
+  const marketBookNo = competitionId === '52' ? '93605' : '76713';
   
-  // Default fallback
   return {
     competitionName: league,
-    competitionId: '52', // Default to Japan Emperor Cup format
-    marketBookNo: '93605' // Default market book number
+    competitionId,
+    marketBookNo
   };
 };
 

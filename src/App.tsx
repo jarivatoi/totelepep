@@ -134,6 +134,7 @@ function App() {
           odds,
           league: match.league,
           kickoff: match.kickoff,
+          competitionId: match.competitionId,
         };
         setParlaySelections(prev => [...prev, newSelection]);
       }
