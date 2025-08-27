@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Calculator, DollarSign } from 'lucide-react';
+import { Trash2, Calculator, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 
 // Totelepep betting API integration
 const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) => {
