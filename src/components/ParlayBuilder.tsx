@@ -4,6 +4,8 @@ import { Trash2, Calculator, DollarSign, CheckCircle, AlertCircle } from 'lucide
 // Totelepep betting API integration
 const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) => {
   try {
+    console.log('🔍 Analyzing selections for market data:', selections);
+    
     // Build the form data in Totelepep's exact format
     const formData = new URLSearchParams();
     
@@ -13,16 +15,19 @@ const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) =
     // Add each selection as SingleBets array
     selections.forEach((selection, index) => {
       // Generate betRef (format: matchId-optionNo)
-      const betRef = `${selection.matchId}-1`;
+      const betRef = `${selection.matchId}-1`; // Keep this format
       
       // Map selection type to option details
       const optionDetails = getOptionDetails(selection);
+      
+      // Extract real market data from the match
+      const marketData = extractMarketData(selection);
       
       formData.append(`data[SingleBets][${index}][betRef]`, betRef);
       formData.append(`data[SingleBets][${index}][isRacing]`, 'false');
       formData.append(`data[SingleBets][${index}][legNo]`, '1');
       formData.append(`data[SingleBets][${index}][matchName]`, `${selection.homeTeam} v ${selection.awayTeam}`);
-      formData.append(`data[SingleBets][${index}][matchStartTime]`, selection.kickoff || '15:00');
+      formData.append(`data[SingleBets][${index}][matchStartTime]`, formatMatchTime(selection.kickoff));
       formData.append(`data[SingleBets][${index}][matchRunTime]`, '0');
       formData.append(`data[SingleBets][${index}][optionNo]`, optionDetails.optionNo);
       formData.append(`data[SingleBets][${index}][optionCode]`, optionDetails.optionCode);
@@ -31,10 +36,10 @@ const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) =
       formData.append(`data[SingleBets][${index}][optionPreviousOdd]`, selection.odds.toString());
       formData.append(`data[SingleBets][${index}][sportName]`, 'Soccer');
       formData.append(`data[SingleBets][${index}][sportIcon]`, 'soccer_icn');
-      formData.append(`data[SingleBets][${index}][competitionName]`, selection.league || 'Football League');
-      formData.append(`data[SingleBets][${index}][competitionId]`, '52'); // Default competition ID
+      formData.append(`data[SingleBets][${index}][competitionName]`, marketData.competitionName);
+      formData.append(`data[SingleBets][${index}][competitionId]`, marketData.competitionId);
       formData.append(`data[SingleBets][${index}][marketId]`, selection.matchId);
-      formData.append(`data[SingleBets][${index}][marketBookNo]`, '93605'); // Default market book number
+      formData.append(`data[SingleBets][${index}][marketBookNo]`, marketData.marketBookNo);
       formData.append(`data[SingleBets][${index}][marketCode]`, 'CP'); // 1X2 market code
       formData.append(`data[SingleBets][${index}][marketLine]`, '');
       formData.append(`data[SingleBets][${index}][marketIsLive]`, '0');
@@ -63,6 +68,14 @@ const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) =
       formData.append(`data[SingleBets][${index}][racingName]`, '');
       formData.append(`data[SingleBets][${index}][priceTag]`, '');
       formData.append(`data[SingleBets][${index}][market]`, '');
+      
+      console.log(`📋 Selection ${index} market data:`, {
+        matchId: selection.matchId,
+        competitionName: marketData.competitionName,
+        competitionId: marketData.competitionId,
+        marketBookNo: marketData.marketBookNo,
+        matchTime: formatMatchTime(selection.kickoff)
+      });
     });
     
     // Proxy bet flag
@@ -105,6 +118,58 @@ const placeTotelepepBet = async (selections: ParlaySelection[], stake: number) =
       errorMessage: error instanceof Error ? error.message : 'Network error'
     };
   }
+};
+
+// Extract market data based on match and league
+const extractMarketData = (selection: ParlaySelection) => {
+  // Map leagues to competition IDs and market book numbers
+  const leagueMapping: Record<string, { competitionId: string; marketBookNo: string }> = {
+    'Japan - Emperor Cup': { competitionId: '52', marketBookNo: '93605' },
+    'Austria - OFB Cup': { competitionId: '81', marketBookNo: '76713' },
+    'England - EFL Cup': { competitionId: '126', marketBookNo: '76713' },
+    'Spain - LaLiga': { competitionId: '163', marketBookNo: '76713' },
+    'UEFA Champions League': { competitionId: '50', marketBookNo: '76713' },
+    'UEFA Conference League': { competitionId: '55', marketBookNo: '76713' },
+    'UEFA Europa League': { competitionId: '135', marketBookNo: '76713' },
+    'Lithuania - A Lyga': { competitionId: '38', marketBookNo: '76713' },
+    'Czechia - Czech Cup': { competitionId: '112', marketBookNo: '76713' },
+  };
+  
+  const league = selection.league || 'Football League';
+  const mapping = leagueMapping[league];
+  
+  if (mapping) {
+    return {
+      competitionName: league,
+      competitionId: mapping.competitionId,
+      marketBookNo: mapping.marketBookNo
+    };
+  }
+  
+  // Default fallback
+  return {
+    competitionName: league,
+    competitionId: '52', // Default to Japan Emperor Cup format
+    marketBookNo: '93605' // Default market book number
+  };
+};
+
+// Format match time to match Totelepep's expected format
+const formatMatchTime = (kickoff?: string): string => {
+  if (!kickoff) return '15:00';
+  
+  // If it's already in HH:MM format, return as is
+  if (/^\d{1,2}:\d{2}$/.test(kickoff)) {
+    return kickoff;
+  }
+  
+  // If it contains date info, extract just the time
+  const timeMatch = kickoff.match(/(\d{1,2}:\d{2})/);
+  if (timeMatch) {
+    return timeMatch[1];
+  }
+  
+  return '15:00'; // Default fallback
 };
 
 // Map selection types to Totelepep option format
