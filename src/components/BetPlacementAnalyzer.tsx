@@ -85,7 +85,7 @@ const BetPlacementAnalyzer: React.FC = () => {
       // Add body for POST requests
       if (method === 'POST') {
         requestOptions.body = JSON.stringify({
-          // Standard bet placement parameters
+          // Totelepep-specific parameters (based on your match data)
           matchId: testBetData.matchId,
           competitionId: testBetData.competitionId,
           marketBookNo: testBetData.marketBookNo,
@@ -93,19 +93,36 @@ const BetPlacementAnalyzer: React.FC = () => {
           odds: testBetData.odds,
           stake: testBetData.stake,
           
-          // Alternative parameter names
+          // Alternative parameter names that might be required
           match_id: testBetData.matchId,
           competition_id: testBetData.competitionId,
           market_book_no: testBetData.marketBookNo,
           selection_id: testBetData.selectionId,
           amount: testBetData.stake,
           betAmount: testBetData.stake,
+          stakeAmount: testBetData.stake,
           
-          // Common betting parameters
+          // Totelepep-specific parameters that might be missing
           betType: 'single',
+          betTypeId: 1,
           currency: 'MUR',
           source: 'web',
-          platform: 'desktop'
+          platform: 'desktop',
+          
+          // Additional parameters that might be required
+          userId: 0, // For guest/pre-bet
+          sessionId: '',
+          deviceId: '',
+          clientId: '',
+          
+          // Multi-bet parameters (even for single bets)
+          multiEnabled: 0,
+          multiStake: testBetData.stake,
+          
+          // Potential required fields based on response structure
+          rebateAmount: 0,
+          bonusAmount: 0,
+          taxAmount: 0
         });
       }
 
@@ -159,43 +176,35 @@ const BetPlacementAnalyzer: React.FC = () => {
   };
 
   const analyzeBetResponse = (data: any): { ticketFound: boolean; ticketNumber?: string } => {
-    const dataStr = JSON.stringify(data).toLowerCase();
+    console.log('📄 Full bet response:', JSON.stringify(data, null, 2));
     
-    // Look for ticket-related fields
-    const ticketFields = [
-      'ticket', 'ticketno', 'ticket_no', 'ticketnumber', 'ticket_number',
-      'betid', 'bet_id', 'betno', 'bet_no', 'betnumber', 'bet_number',
-      'reference', 'ref', 'confirmation', 'receipt', 'slip', 'slipno'
-    ];
-    
-    let ticketNumber: string | undefined;
-    
-    // Search for ticket numbers in the response
-    const searchForTicket = (obj: any, path: string = ''): void => {
-      if (typeof obj !== 'object' || obj === null) return;
+    // Handle Totelepep-specific response format
+    if (data.errorMessage) {
+      console.log(`⚠️ Totelepep Error: ${data.errorMessage}`);
       
-      Object.entries(obj).forEach(([key, value]) => {
-        const keyLower = key.toLowerCase();
-        
-        if (ticketFields.some(field => keyLower.includes(field))) {
-          if (typeof value === 'string' || typeof value === 'number') {
-            ticketNumber = value.toString();
-            console.log(`🎫 Found potential ticket: ${key} = ${value}`);
-          }
-        }
-        
-        if (typeof value === 'object') {
-          searchForTicket(value, `${path}.${key}`);
-        }
-      });
-    };
+      // Check if we got a partial response with some data
+      if (data.ticketNo && data.ticketNo !== "") {
+        console.log(`🎫 Ticket found despite error: ${data.ticketNo}`);
+        return { ticketFound: true, ticketNumber: data.ticketNo };
+      }
+      
+      // Log all response fields for analysis
+      console.log('📊 Response analysis:');
+      console.log(`   multiErrorCode: ${data.multiErrorCode}`);
+      console.log(`   multiEnabled: ${data.multiEnabled}`);
+      console.log(`   betList length: ${data.betList?.length || 0}`);
+      console.log(`   balanceAmount: ${data.balanceAmount}`);
+      
+      return { ticketFound: false };
+    }
     
-    searchForTicket(data);
+    // Success case - look for ticket number
+    if (data.ticketNo && data.ticketNo !== "") {
+      console.log(`✅ Ticket number found: ${data.ticketNo}`);
+      return { ticketFound: true, ticketNumber: data.ticketNo };
+    }
     
-    return {
-      ticketFound: !!ticketNumber,
-      ticketNumber
-    };
+    return { ticketFound: false };
   };
 
   const analyzeBetEndpoints = async () => {
@@ -221,7 +230,12 @@ const BetPlacementAnalyzer: React.FC = () => {
         const result = await testBetEndpoint(endpointInfo);
         
         setResults(prev => prev.map(r => 
-          r.endpoint === endpointInfo.endpoint && r.method === endpointInfo.method ? result : r
+          r.endpoint === endpointInfo.endpoint && r.method === endpointInfo.method ? {
+            ...result,
+            // Add Totelepep-specific error analysis
+            totelepepError: result.response?.errorMessage,
+            hasPartialData: !!(result.response?.multiEnabled !== undefined)
+          } : r
         ));
         
         // Add delay between requests
@@ -441,6 +455,17 @@ const BetPlacementAnalyzer: React.FC = () => {
                       {result.error && (
                         <div className="mt-1 text-sm text-red-600">
                           {result.error}
+                        </div>
+                      )}
+                      
+                      {result.totelepepError && (
+                        <div className="mt-2 bg-yellow-100 text-yellow-800 px-3 py-2 rounded text-sm">
+                          <strong>Totelepep Error:</strong> {result.totelepepError}
+                          {result.hasPartialData && (
+                            <div className="mt-1 text-xs">
+                              ✅ Got Totelepep response format - endpoint is correct!
+                            </div>
+                          )}
                         </div>
                       )}
                       
