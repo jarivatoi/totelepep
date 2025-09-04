@@ -82,7 +82,7 @@ const MatchTable: React.FC<MatchTableProps> = ({
                     {match.homeTeam} vs {match.awayTeam}
                   </div>
                   <div className="text-sm text-gray-600">
-                    {match.league}
+                    {match.league || `Competition ${match.competitionId}`}
                     {match.competitionId && (
                       <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
                         ID: {match.competitionId}
