@@ -192,7 +192,6 @@ class TotelepepExtractor {
     }
   }
 
-  private parseTotelepepMatchData(matchDataString: string): TotelepepMatch[] {
   private parseTotelepepMatchData(matchDataString: string, competitionMap: Map<string, string>): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
@@ -678,6 +677,7 @@ class TotelepepExtractor {
         homeTeam: apiMatch.homeTeam || apiMatch.home || apiMatch.team1 || apiMatch.homeTeamName || apiMatch.participant1 || 'Home Team',
         awayTeam: apiMatch.awayTeam || apiMatch.away || apiMatch.team2 || apiMatch.awayTeamName || apiMatch.participant2 || 'Away Team',
         league: apiMatch.league || apiMatch.competition || apiMatch.tournament || apiMatch.competitionName || apiMatch.categoryName || 'Football League',
+        competitionId: apiMatch.competitionId || apiMatch.compId || apiMatch.tournamentId || '0',
         kickoff: this.formatTime(apiMatch.time || apiMatch.kickoff || apiMatch.startTime),
         date: this.formatDate(apiMatch.date || apiMatch.matchDate || apiMatch.gameDate),
         status: this.parseStatus(apiMatch.status || apiMatch.state || apiMatch.matchStatus) as 'upcoming' | 'live' | 'finished',
@@ -919,6 +919,7 @@ class TotelepepExtractor {
         homeTeam: teamInfo.home,
         awayTeam: teamInfo.away,
         league: league || 'Football League',
+        competitionId: '0',
         kickoff: matchTime || this.generateRealisticTime(),
         date: this.getTodayDate(),
         status: 'upcoming' as const,
@@ -966,6 +967,7 @@ class TotelepepExtractor {
       homeTeam: teamInfo.home,
       awayTeam: teamInfo.away,
       league: 'Football League',
+      competitionId: '0',
       kickoff: matchTime || this.generateRealisticTime(),
       date: this.getTodayDate(),
       status: 'upcoming' as const,
@@ -990,6 +992,7 @@ class TotelepepExtractor {
       homeTeam: item.homeTeam || item.home || item.team1 || 'Home Team',
       awayTeam: item.awayTeam || item.away || item.team2 || 'Away Team',
       league: item.league || item.competition || item.tournament || 'Football League',
+      competitionId: item.competitionId || item.compId || item.tournamentId || '0',
       kickoff: this.formatTime(item.time || item.kickoff || item.start),
       date: this.formatDate(item.date || item.matchDate),
       status: this.parseStatus(item.status || item.state) as 'upcoming' | 'live' | 'finished',
