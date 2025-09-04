@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Search, Calendar, AlertCircle, Calculator, Database, Lightbulb } from 'lucide-react';
-import { Target, Ticket } from 'lucide-react';
+import { Target, Ticket, ArrowUpDown } from 'lucide-react';
 import DateGroupedMatches from './components/DateGroupedMatches';
 import DateSelector from './components/DateSelector';
 import Header from './components/Header';
@@ -19,6 +19,7 @@ import { totelepepService, TotelepepMatch } from './services/totelepepService';
 import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
 import { usePWA } from './hooks/usePWA';
 
+type SortOption = 'date' | 'competition' | 'time';
 function App() {
   const [matches, setMatches] = useState<TotelepepMatch[]>([]);
   const [groupedMatches, setGroupedMatches] = useState<Record<string, TotelepepMatch[]>>({});
@@ -36,6 +37,8 @@ function App() {
   const [showBookingGuide, setShowBookingGuide] = useState(false);
   const [showCompetitionExtractor, setShowCompetitionExtractor] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [sortBy, setSortBy] = useState<SortOption>('date');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   
   const { isOnline } = usePWA();
 
@@ -81,6 +84,17 @@ function App() {
   // Load data only on initial mount
   useEffect(() => {
     loadData(selectedDate);
+    
+    // Close sort dropdown when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.relative')) {
+        setShowSortDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []); // Empty dependency array - only runs once on mount
 
   // Filter matches and maintain grouping
@@ -104,8 +118,38 @@ function App() {
     return filtered;
   }, [groupedMatches, searchTerm]);
 
+  // Sort matches based on selected option
+  const sortedGroupedMatches = React.useMemo(() => {
+    const sorted: Record<string, TotelepepMatch[]> = {};
+    
+    Object.entries(filteredGroupedMatches).forEach(([date, dateMatches]) => {
+      let sortedMatches = [...dateMatches];
+      
+      switch (sortBy) {
+        case 'competition':
+          sortedMatches.sort((a, b) => a.league.localeCompare(b.league));
+          break;
+        case 'time':
+          sortedMatches.sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+          break;
+        case 'date':
+        default:
+          // Keep original date/time sorting
+          sortedMatches.sort((a, b) => {
+            const dateComparison = a.date.localeCompare(b.date);
+            if (dateComparison !== 0) return dateComparison;
+            return a.kickoff.localeCompare(b.kickoff);
+          });
+          break;
+      }
+      
+      sorted[date] = sortedMatches;
+    });
+    
+    return sorted;
+  }, [filteredGroupedMatches, sortBy]);
   const totalMatches = matches.length;
-  const totalFilteredMatches = Object.values(filteredGroupedMatches)
+  const totalFilteredMatches = Object.values(sortedGroupedMatches)
     .reduce((sum, dateMatches) => sum + dateMatches.length, 0);
   
   // Debug: Log grouped matches to see what dates we have
@@ -287,6 +331,56 @@ function App() {
                   Parlay ({parlaySelections.length})
                 </button>
               )}
+              
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all duration-200"
+                >
+                  <ArrowUpDown className="w-4 h-4" />
+                  Sort by {sortBy === 'date' ? 'Date' : sortBy === 'competition' ? 'Competition' : 'Time'}
+                </button>
+                
+                {showSortDropdown && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[160px]">
+                    <button
+                      onClick={() => {
+                        setSortBy('date');
+                        setShowSortDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors ${
+                        sortBy === 'date' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                      }`}
+                    >
+                      Sort by Date
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortBy('competition');
+                        setShowSortDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors ${
+                        sortBy === 'competition' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                      }`}
+                    >
+                      Sort by Competition
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortBy('time');
+                        setShowSortDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors ${
+                        sortBy === 'time' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                      }`}
+                    >
+                      Sort by Time
+                    </button>
+                  </div>
+                )}
+              </div>
+              
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -384,7 +478,7 @@ function App() {
         </div>
 
         <DateGroupedMatches
-          groupedMatches={filteredGroupedMatches}
+          groupedMatches={sortedGroupedMatches}
           loading={loading}
           onPriceClick={handlePriceClick}
           selectedPrices={parlaySelections.map(s => `${s.matchId}-${s.priceType}`)}
