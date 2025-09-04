@@ -318,7 +318,7 @@ function App() {
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"
               >
                 <Database className="w-4 h-4" />
-                Extract with Real Odds
+                Extract with REAL Totelepep Odds
               </button>
             </div>
           </div>

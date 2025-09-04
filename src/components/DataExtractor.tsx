@@ -32,20 +32,21 @@ const DataExtractor: React.FC<DataExtractorProps> = ({ onDataExtracted }) => {
       setExtractionStatus('Processing odds and times...');
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      // Generate realistic extracted data
-      const extractedData = generateRealisticMatches();
+      // Use real Totelepep extractor instead of mock data
+      console.log('🔍 Using real Totelepep extractor...');
+      const extractedData = await window.totelepepExtractor.extractMatches();
       setExtractedCount(extractedData.length);
       
       // Set debug data to show table structure
       setDebugData({
-        apiSample: generateSampleAPIResponse(),
+        apiSample: 'Real Totelepep API data extracted',
         extractedMatches: extractedData.slice(0, 3), // Show first 3 matches
         extractionSteps: [
           'Connected to Totelepep JSON API endpoint',
-          'Fetched structured match data (no HTML parsing needed)',
-          'Mapped API fields to match objects',
-          'Validated odds and team data',
-          'Validated match data and removed duplicates'
+          'Parsed pipe-delimited match data from API response',
+          'Extracted REAL 1X2 odds from fields 7, 9, 11',
+          'Calculated realistic BTTS/O/U odds based on 1X2 patterns',
+          'Validated match data and removed invalid entries'
         ]
       });
       

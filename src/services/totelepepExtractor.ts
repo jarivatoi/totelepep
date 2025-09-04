@@ -263,10 +263,16 @@ class TotelepepExtractor {
       const teamsString = fields[2]; // e.g., "Austria Lustenau v Kapfenberger SV"
       const datetime = fields[3]; // e.g., "26 Aug 20:30"
       
-      // Use comprehensive odds extraction
-      const homeOdds = allOdds.homeOdds || parseFloat(fields[7]);
-      const drawOdds = allOdds.drawOdds || parseFloat(fields[9]);
-      const awayOdds = allOdds.awayOdds || parseFloat(fields[11]);
+      // Extract REAL odds from the API response - no fallback to generated odds
+      const homeOdds = this.parseRealOdds(fields[7]) || allOdds.homeOdds;
+      const drawOdds = this.parseRealOdds(fields[9]) || allOdds.drawOdds;
+      const awayOdds = this.parseRealOdds(fields[11]) || allOdds.awayOdds;
+      
+      // Only proceed if we have real 1X2 odds
+      if (!homeOdds || !drawOdds || !awayOdds) {
+        console.warn(`⚠️ Entry ${index}: Missing real 1X2 odds - skipping match`);
+        return null;
+      }
       
       // Extract team names from teams string
       const teamNames = this.extractTeamNamesFromTotelepepString(teamsString);
@@ -295,17 +301,17 @@ class TotelepepExtractor {
         kickoff: time,
         date,
         status: 'upcoming' as const,
-        homeOdds: isNaN(homeOdds) ? this.generateRealisticOdds() : homeOdds,
-        drawOdds: isNaN(drawOdds) ? this.generateRealisticOdds() : drawOdds,
-        awayOdds: isNaN(awayOdds) ? this.generateRealisticOdds() : awayOdds,
+        homeOdds,
+        drawOdds, 
+        awayOdds,
         overUnder: {
-          over: allOdds.overOdds || this.generateRealisticOdds(),
-          under: allOdds.underOdds || this.generateRealisticOdds(),
+          over: allOdds.overOdds || this.calculateRealisticOverOdds(homeOdds, drawOdds, awayOdds),
+          under: allOdds.underOdds || this.calculateRealisticUnderOdds(homeOdds, drawOdds, awayOdds),
           line: 2.5,
         },
         bothTeamsScore: {
-          yes: allOdds.bttsYes || this.generateRealisticOdds(),
-          no: allOdds.bttsNo || this.generateRealisticOdds(),
+          yes: allOdds.bttsYes || this.calculateRealisticBTTSYes(homeOdds, drawOdds, awayOdds),
+          no: allOdds.bttsNo || this.calculateRealisticBTTSNo(homeOdds, drawOdds, awayOdds),
         },
       };
       
@@ -322,6 +328,33 @@ class TotelepepExtractor {
     }
   }
 
+  private parseRealOdds(oddsString: string): number | null {
+    if (!oddsString || oddsString.trim() === '') return null;
+    
+    const trimmed = oddsString.trim();
+    
+    // Handle different odds formats from Totelepep
+    let oddsValue = parseFloat(trimmed);
+    
+    // Convert integer formats to decimal odds
+    if (!isNaN(oddsValue)) {
+      // If it's a whole number between 100-9999, convert to decimal
+      if (oddsValue >= 100 && oddsValue <= 9999 && !trimmed.includes('.')) {
+        if (oddsValue >= 1000) {
+          oddsValue = oddsValue / 1000; // 1500 -> 1.5
+        } else {
+          oddsValue = oddsValue / 100;  // 150 -> 1.5
+        }
+      }
+      
+      // Validate realistic betting odds range
+      if (oddsValue >= 1.01 && oddsValue <= 100.0) {
+        return Math.round(oddsValue * 100) / 100; // Round to 2 decimal places
+      }
+    }
+    
+    return null;
+  }
   private extractAllOddsFromEntry(fields: string[], entryIndex: number): any {
     const odds: any = {
       homeOdds: null,
