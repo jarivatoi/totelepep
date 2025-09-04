@@ -279,13 +279,18 @@ class TotelepepExtractor {
         drawOdds: odds.draw || 3.00,
         awayOdds: odds.away || 2.50,
         overUnder: {
-          over: odds.over25 || 1.85,
-          under: odds.under25 || 1.95,
+          over: odds.over25 || null,
+          under: odds.under25 || null,
           line: 2.5,
         },
         bothTeamsScore: {
-          yes: odds.bttsYes || 1.70,
-          no: odds.bttsNo || 2.10,
+          yes: odds.bttsYes || null,
+          no: odds.bttsNo || null,
+        },
+        halfTime: {
+          home: odds.homeHT || null,
+          draw: odds.drawHT || null,
+          away: odds.awayHT || null,
         },
         homeScore: match.homeScore,
         awayScore: match.awayScore,
@@ -306,40 +311,41 @@ class TotelepepExtractor {
       home: null,
       draw: null,
       away: null,
+      homeHT: null,
+      drawHT: null,
+      awayHT: null,
       over25: null,
       under25: null,
       bttsYes: null,
       bttsNo: null
     };
     
-    console.log(`🎯 Extracting odds from ${markets.length} markets...`);
+    console.log(`🎯 Extracting odds from ${markets.length} markets using Power Query method...`);
     
     markets.forEach((market: any, index: number) => {
-      const marketCode = market.marketCode;
       const marketName = market.marketDisplayName?.toLowerCase() || '';
+      const exactMarketName = market.marketDisplayName || '';
       
-      console.log(`   Market ${index + 1}: "${market.marketDisplayName}" (${marketCode})`);
+      console.log(`   Market ${index + 1}: "${exactMarketName}" (${market.marketCode})`);
       
-      // Extract 1X2 odds (CP market)
-      if (marketCode === 'CP' || marketName.includes('1 x 2')) {
+      // Power Query: "1 X 2" market (Full Time)
+      if (exactMarketName === "1 X 2") {
         this.extract1X2Odds(market, odds);
       }
       
-      // Extract BTTS odds (Power Query: "Both Team To Score ")
+      // Power Query: "1 X 2   - Half Time" market
+      if (exactMarketName === "1 X 2   - Half Time") {
+        this.extractHalfTime1X2Odds(market, odds);
+      }
+      
+      // Power Query: "Both Team To Score " market (exact match)
       if (market.marketDisplayName === "Both Team To Score ") {
         this.extractBTTSOdds(market, odds);
       }
       
-      // Extract Over/Under 2.5 odds
-      if (marketName.includes('under over +2.5') || marketName.includes('total goals 2.5')) {
+      // Power Query: Over/Under markets (look for +2.5 in name)
+      if (exactMarketName.includes('+2.5')) {
         this.extractOverUnderOdds(market, odds);
-      }
-      
-      // Log all selections for debugging
-      if (market.selectionList && Array.isArray(market.selectionList)) {
-        market.selectionList.forEach((selection: any, selIndex: number) => {
-          console.log(`     Selection ${selIndex + 1}: ${selection.name} = ${selection.companyOdds}`);
-        });
       }
     });
     
@@ -348,24 +354,51 @@ class TotelepepExtractor {
   }
 
   private extract1X2Odds(market: any, odds: any): void {
-    console.log(`   🎯 Processing 1X2 market: "${market.marketDisplayName}"`);
+    console.log(`   🎯 Processing Full Time 1X2 market`);
     
+    // Power Query method: List.Transform([markets], each if [marketDisplayName] = "1 X 2" then...)
     if (market.selectionList && Array.isArray(market.selectionList)) {
-      market.selectionList.forEach((selection: any) => {
-        const selectionName = selection.name;
-        const oddsValue = parseFloat(selection.companyOdds);
+      market.selectionList.forEach((selection: any, index: number) => {
+        // Power Query uses Record.Field([selectionList]{index},"companyOdds")
+        const companyOdds = selection.companyOdds;
+        const oddsValue = parseFloat(companyOdds);
         
         if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
-          // Map selection names to odds types
-          if (selectionName === '1' || selectionName.toLowerCase().includes('home')) {
+          // Power Query: selectionList{0} = Home, selectionList{1} = Draw, selectionList{2} = Away
+          if (index === 0) {
             odds.home = oddsValue;
-            console.log(`   ✅ Home odds: ${oddsValue}`);
-          } else if (selectionName === 'X' || selectionName.toLowerCase().includes('draw')) {
+            console.log(`   ✅ Home (FT): ${oddsValue} (from companyOdds: ${companyOdds})`);
+          } else if (index === 1) {
             odds.draw = oddsValue;
-            console.log(`   ✅ Draw odds: ${oddsValue}`);
-          } else if (selectionName === '2' || selectionName.toLowerCase().includes('away')) {
+            console.log(`   ✅ Draw (FT): ${oddsValue} (from companyOdds: ${companyOdds})`);
+          } else if (index === 2) {
             odds.away = oddsValue;
-            console.log(`   ✅ Away odds: ${oddsValue}`);
+            console.log(`   ✅ Away (FT): ${oddsValue} (from companyOdds: ${companyOdds})`);
+          }
+        }
+      });
+    }
+  }
+
+  private extractHalfTime1X2Odds(market: any, odds: any): void {
+    console.log(`   🎯 Processing Half Time 1X2 market`);
+    
+    // Power Query: "1 X 2   - Half Time" market
+    if (market.selectionList && Array.isArray(market.selectionList)) {
+      market.selectionList.forEach((selection: any, index: number) => {
+        const companyOdds = selection.companyOdds;
+        const oddsValue = parseFloat(companyOdds);
+        
+        if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
+          if (index === 0) {
+            odds.homeHT = oddsValue;
+            console.log(`   ✅ Home (HT): ${oddsValue}`);
+          } else if (index === 1) {
+            odds.drawHT = oddsValue;
+            console.log(`   ✅ Draw (HT): ${oddsValue}`);
+          } else if (index === 2) {
+            odds.awayHT = oddsValue;
+            console.log(`   ✅ Away (HT): ${oddsValue}`);
           }
         }
       });
@@ -373,20 +406,22 @@ class TotelepepExtractor {
   }
 
   private extractBTTSOdds(market: any, odds: any): void {
-    console.log(`   🎯 Processing BTTS market: "${market.marketDisplayName}"`);
+    console.log(`   🎯 Processing BTTS market`);
     
+    // Power Query: "Both Team To Score " market (exact match)
     if (market.selectionList && Array.isArray(market.selectionList)) {
-      market.selectionList.forEach((selection: any) => {
-        const selectionName = selection.name;
-        const oddsValue = parseFloat(selection.companyOdds);
+      market.selectionList.forEach((selection: any, index: number) => {
+        const companyOdds = selection.companyOdds;
+        const oddsValue = parseFloat(companyOdds);
         
         if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
-          if (selectionName === 'YES' || selectionName.toLowerCase().includes('yes')) {
+          // Power Query: selectionList{0} = YES, selectionList{1} = NO
+          if (index === 0) {
             odds.bttsYes = oddsValue;
-            console.log(`   ✅ BTTS Yes: ${oddsValue}`);
-          } else if (selectionName === 'NO' || selectionName.toLowerCase().includes('no')) {
+            console.log(`   ✅ BTTS Yes: ${oddsValue} (from companyOdds: ${companyOdds})`);
+          } else if (index === 1) {
             odds.bttsNo = oddsValue;
-            console.log(`   ✅ BTTS No: ${oddsValue}`);
+            console.log(`   ✅ BTTS No: ${oddsValue} (from companyOdds: ${companyOdds})`);
           }
         }
       });
@@ -394,20 +429,22 @@ class TotelepepExtractor {
   }
 
   private extractOverUnderOdds(market: any, odds: any): void {
-    console.log(`   🎯 Processing Over/Under market: "${market.marketDisplayName}"`);
+    console.log(`   🎯 Processing Over/Under market`);
     
+    // Power Query: Markets with "+2.5" in marketDisplayName
     if (market.selectionList && Array.isArray(market.selectionList)) {
-      market.selectionList.forEach((selection: any) => {
-        const selectionName = selection.name;
-        const oddsValue = parseFloat(selection.companyOdds);
+      market.selectionList.forEach((selection: any, index: number) => {
+        const companyOdds = selection.companyOdds;
+        const oddsValue = parseFloat(companyOdds);
         
         if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
-          if (selectionName === 'Over' || selectionName.toLowerCase().includes('over')) {
+          // Power Query: selectionList{0} = Over, selectionList{1} = Under
+          if (index === 0) {
             odds.over25 = oddsValue;
-            console.log(`   ✅ Over 2.5: ${oddsValue}`);
-          } else if (selectionName === 'Under' || selectionName.toLowerCase().includes('under')) {
+            console.log(`   ✅ Over 2.5: ${oddsValue} (from companyOdds: ${companyOdds})`);
+          } else if (index === 1) {
             odds.under25 = oddsValue;
-            console.log(`   ✅ Under 2.5: ${oddsValue}`);
+            console.log(`   ✅ Under 2.5: ${oddsValue} (from companyOdds: ${companyOdds})`);
           }
         }
       });
