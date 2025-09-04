@@ -78,8 +78,15 @@ function App() {
 
   // Load data only on initial mount
   useEffect(() => {
+    console.log('🚀 App mounted, loading initial data...');
     loadData(selectedDate);
-  }, []); // Empty dependency array - only runs once on mount
+  }, []);
+
+  // Also load data when date changes
+  useEffect(() => {
+    console.log('📅 Date changed to:', selectedDate);
+    loadData(selectedDate);
+  }, [selectedDate]);
 
   // Filter matches and maintain grouping
   const filteredGroupedMatches = React.useMemo(() => {
