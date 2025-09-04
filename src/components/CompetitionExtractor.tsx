@@ -93,7 +93,7 @@ const CompetitionExtractor: React.FC = () => {
     }
   };
 
-  private parseCompetitionData = (competitionData: string): Competition[] => {
+  const parseCompetitionData = (competitionData: string): Competition[] => {
     const competitions: Competition[] = [];
     
     try {
@@ -129,7 +129,7 @@ const CompetitionExtractor: React.FC = () => {
     return competitions;
   };
 
-  private extractCompetitionsFromMatches = (matchData: string): Competition[] => {
+  const extractCompetitionsFromMatches = (matchData: string): Competition[] => {
     const competitions = new Map<string, number>();
     
     try {
