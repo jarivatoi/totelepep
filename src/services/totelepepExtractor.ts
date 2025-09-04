@@ -280,17 +280,9 @@ class TotelepepExtractor {
       
       // Get competition name from competitionData if available
       const competitionId = fields[1];
-      const marketBookNo = fields[15] || ''; // Extract marketBookNo from field 15
-      const marketCode = fields[16] || 'CP'; // Extract marketCode from field 16
-      const league = this.getLeagueFromCompetitionId(competitionId) || `Competition ${competitionId}`;
-      
-      console.log(`🏆 Match ${matchId} competition data:`, {
-        competitionId,
-        marketBookNo,
-        marketCode,
-        league,
-        allFields: fields.slice(0, 20) // Show first 20 fields for debugging
-      });
+      const marketBookNo = fields[15]; // Extract marketBookNo from field 15
+      const marketCode = fields[16]; // Extract marketCode from field 16
+      const league = this.getLeagueFromCompetitionId(competitionId) || 'Football League';
       
       const match: TotelepepMatch = {
         id: matchId,
@@ -569,46 +561,20 @@ class TotelepepExtractor {
   }
 
   private getLeagueFromCompetitionId(competitionId: string): string | null {
-    // Map competition IDs to proper league names based on Totelepep data
+    // This would map competition IDs to league names
+    // For now, return a generic name
     const competitionMap: Record<string, string> = {
-      '17': 'Iran - Pro League',
-      '35': 'Egypt - Premier League',
-      '38': 'Lithuania - A Lyga',
-      '50': 'UEFA Champions League',
-      '52': 'Japan - Emperor Cup',
-      '55': 'UEFA Conference League',
       '81': 'Austria - OFB Cup',
-      '112': 'Czechia - Czech Cup',
-      '126': 'England - EFL Cup',
-      '135': 'UEFA Europa League',
-      '138': 'Germany - DFB Pokal',
-      '163': 'Spain - LaLiga',
       '234': 'Croatia - Croatian Cup',
-      // Add more common competition IDs
-      '1': 'England - Premier League',
-      '2': 'England - Championship',
-      '3': 'England - League One',
-      '4': 'England - League Two',
-      '5': 'Spain - Segunda Division',
-      '6': 'Italy - Serie A',
-      '7': 'Italy - Serie B',
-      '8': 'Germany - Bundesliga',
-      '9': 'Germany - 2. Bundesliga',
-      '10': 'France - Ligue 1',
-      '11': 'France - Ligue 2',
-      '12': 'Netherlands - Eredivisie',
-      '13': 'Portugal - Primeira Liga',
-      '14': 'Belgium - Pro League',
-      '15': 'Scotland - Premiership',
-      '16': 'Turkey - Super Lig',
-      '18': 'Brazil - Serie A',
-      '19': 'Argentina - Primera Division',
-      '20': 'Mexico - Liga MX'
+      '112': 'Czechia - Czech Cup',
+      '35': 'Egypt - Premier League',
+      '126': 'England - EFL Cup',
+      '138': 'Germany - DFB Pokal',
+      '50': 'UEFA Champions League',
+      '17': 'Iran - Pro League'
     };
     
-    const leagueName = competitionMap[competitionId];
-    console.log(`🏆 Competition ${competitionId} mapped to: ${leagueName || `Competition ${competitionId}`}`);
-    return leagueName;
+    return competitionMap[competitionId] || null;
   }
 
   private convertAPIMatchToTotelepepMatch(apiMatch: any, index: number): TotelepepMatch | null {
