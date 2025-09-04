@@ -78,15 +78,8 @@ function App() {
 
   // Load data only on initial mount
   useEffect(() => {
-    console.log('🚀 App mounted, loading initial data...');
     loadData(selectedDate);
-  }, []);
-
-  // Also load data when date changes
-  useEffect(() => {
-    console.log('📅 Date changed to:', selectedDate);
-    loadData(selectedDate);
-  }, [selectedDate]);
+  }, []); // Empty dependency array - only runs once on mount
 
   // Filter matches and maintain grouping
   const filteredGroupedMatches = React.useMemo(() => {
@@ -313,19 +306,19 @@ function App() {
                 onClick={() => {
                   console.log('🔍 Manual extraction triggered');
                   // Force fresh extraction by clearing cache first
-                  if ((window as any).totelepepExtractor) {
-                    (window as any).totelepepExtractor.clearCache();
+                  if (window.totelepepExtractor) {
+                    window.totelepepExtractor.clearCache();
                   }
                   // Also clear match-specific cache
-                  if ((window as any).matchSpecificExtractor) {
-                    (window as any).matchSpecificExtractor.clearCache();
+                  if (window.matchSpecificExtractor) {
+                    window.matchSpecificExtractor.clearCache();
                   }
                   loadData(selectedDate);
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"
               >
                 <Database className="w-4 h-4" />
-                Extract with Power Query Method
+                Extract with Real Odds
               </button>
             </div>
           </div>

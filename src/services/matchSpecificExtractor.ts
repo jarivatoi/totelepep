@@ -5,7 +5,11 @@ interface MatchOddsData {
   over25?: number;
   under25?: number;
   additionalOdds?: Record<string, number>;
-  allMarkets?: any[];
+}
+
+interface NameValuePair {
+  Name: string;
+  Value: string;
 }
 
 class MatchSpecificExtractor {
@@ -29,7 +33,7 @@ class MatchSpecificExtractor {
 
       console.log(`🔍 Fetching detailed odds for match ${matchId} in competition ${competitionId}...`);
       
-      // Use the exact Power Query endpoint structure
+      // Use the Power Query endpoint structure
       const endpoint = `/api/webapi/GetMatch?sportId=soccer&competitionId=${competitionId}&matchId=${matchId}&periodCode=all`;
       
       const response = await fetch(endpoint, {
@@ -50,8 +54,8 @@ class MatchSpecificExtractor {
       const data = await response.json();
       console.log(`📄 Match ${matchId} response:`, data);
 
-      // Parse using Power Query logic (Table.ExpandTableColumn equivalent)
-      const oddsData = this.parseMatchResponse(data, matchId);
+      // Parse the Name/Value structure (like Power Query Table.ExpandTableColumn)
+      const oddsData = this.parseNameValueResponse(data, matchId);
       
       if (oddsData) {
         this.setCachedData(oddsData, cacheKey);
@@ -67,30 +71,20 @@ class MatchSpecificExtractor {
     }
   }
 
-  private parseMatchResponse(data: any, matchId: string): MatchOddsData | null {
+  private parseNameValueResponse(data: any, matchId: string): MatchOddsData | null {
     try {
-      console.log(`🔧 Parsing match response for ${matchId}...`);
-      
-      // Find the target match in the response
+      console.log(`🔧 Parsing markets response for match ${matchId}...`);
+      console.log(`📄 Response structure:`, JSON.stringify(data, null, 2));
+
+      // Find the match in the competitions array
       let targetMatch = null;
-      
-      // Check competitions array first
       if (data.competitions && Array.isArray(data.competitions)) {
         for (const competition of data.competitions) {
           if (competition.matches && Array.isArray(competition.matches)) {
-            targetMatch = competition.matches.find((match: any) => 
-              match.id?.toString() === matchId || match.matchId?.toString() === matchId
-            );
+            targetMatch = competition.matches.find((match: any) => match.id.toString() === matchId);
             if (targetMatch) break;
           }
         }
-      }
-      
-      // Check direct matches array
-      if (!targetMatch && data.matches && Array.isArray(data.matches)) {
-        targetMatch = data.matches.find((match: any) => 
-          match.id?.toString() === matchId || match.matchId?.toString() === matchId
-        );
       }
 
       if (!targetMatch) {
@@ -98,37 +92,51 @@ class MatchSpecificExtractor {
         return null;
       }
 
-      console.log(`📊 Found target match:`, targetMatch);
+      // CRITICAL ANALYSIS: Market count vs actual markets
+      const expectedMarkets = targetMatch.marketCount || 0;
+      const actualMarkets = targetMatch.markets ? targetMatch.markets.length : 0;
+      const missingMarkets = expectedMarkets - actualMarkets;
 
-      const oddsData: MatchOddsData = { 
-        matchId,
-        allMarkets: targetMatch.markets || []
-      };
-
-      // Extract odds from all markets (Power Query: Table.ExpandTableColumn)
-      if (targetMatch.markets && Array.isArray(targetMatch.markets)) {
-        console.log(`📋 Processing ${targetMatch.markets.length} markets for match ${matchId}...`);
-        
-        targetMatch.markets.forEach((market: any, index: number) => {
-          console.log(`   Market ${index + 1}: "${market.marketDisplayName}" (${market.marketCode})`);
-          
-          // Power Query exact match: "Both Team To Score "
-          if (market.marketDisplayName === "Both Team To Score ") {
-            this.extractBTTSFromMarket(market, oddsData);
-          }
-          
-          // Over/Under 2.5 markets
-          if (market.marketDisplayName?.includes('+2.5')) {
-            this.extractOverUnderFromMarket(market, oddsData);
-          }
-        });
+      console.log(`📊 MARKET ANALYSIS for match ${matchId}:`);
+      console.log(`   Expected markets: ${expectedMarkets}`);
+      console.log(`   Actual markets: ${actualMarkets}`);
+      console.log(`   Missing markets: ${missingMarkets}`);
+      
+      if (missingMarkets > 0) {
+        console.log(`🚨 MISSING ${missingMarkets} MARKETS! These likely contain BTTS/Over-Under odds`);
       }
 
-      console.log(`📊 Match ${matchId} final odds:`, {
+      // Analyze available markets
+      if (targetMatch.markets && Array.isArray(targetMatch.markets)) {
+        console.log(`📋 Available markets:`);
+        targetMatch.markets.forEach((market: any, index: number) => {
+          console.log(`   ${index + 1}. ${market.marketDisplayName} (Code: ${market.marketCode}, Period: ${market.periodCode})`);
+        });
+
+        // Look for market codes that might indicate other market types
+        const marketCodes = targetMatch.markets.map((m: any) => m.marketCode);
+        const uniqueCodes = [...new Set(marketCodes)];
+        console.log(`📊 Market codes found: ${uniqueCodes.join(', ')}`);
+        
+        if (uniqueCodes.length === 1 && uniqueCodes[0] === 'CP') {
+          console.log(`⚠️ Only CP (1X2) markets found. Need to find parameters for other market types.`);
+        }
+      }
+
+      const oddsData: MatchOddsData = { matchId };
+
+      // Parse the markets structure
+      if (targetMatch.markets && Array.isArray(targetMatch.markets)) {
+        this.parseMarketsArray(targetMatch.markets, oddsData);
+      }
+
+      // Log all found odds
+      console.log(`📊 Match ${matchId} extracted odds:`, {
         bttsYes: oddsData.bttsYes,
         bttsNo: oddsData.bttsNo,
         over25: oddsData.over25,
-        under25: oddsData.under25
+        under25: oddsData.under25,
+        additionalOdds: oddsData.additionalOdds
       });
 
       return Object.keys(oddsData).length > 1 ? oddsData : null;
@@ -139,44 +147,287 @@ class MatchSpecificExtractor {
     }
   }
 
-  private extractBTTSFromMarket(market: any, oddsData: MatchOddsData): void {
-    console.log(`   🎯 Extracting BTTS odds from market: "${market.marketDisplayName}"`);
+  private parseMarketsArray(markets: any[], oddsData: MatchOddsData): void {
+    console.log(`🔍 Processing ${markets.length} markets...`);
+
+    // Power Query equivalent: List.Transform([markets], each if [marketDisplayName] = "Both Team To Score " then [marketBookNo] else "")
+    const bttsBookNumbers: string[] = [];
+    const ouBookNumbers: string[] = [];
+    
+    markets.forEach((market, index) => {
+      const marketCode = market.marketCode;
+      const marketName = market.marketDisplayName?.toLowerCase() || '';
+      const periodCode = market.periodCode;
+      
+      console.log(`   Market ${index + 1}: "${market.marketDisplayName}" (${marketCode}/${periodCode})`);
+      
+      // Power Query logic: Extract BookNo for BTTS markets
+      if (market.marketDisplayName === "Both Team To Score ") {
+        bttsBookNumbers.push(market.marketBookNo.toString());
+        console.log(`   📋 BTTS BookNo collected: ${market.marketBookNo}`);
+      }
+      
+      // Extract BookNo for Over/Under 2.5 markets
+      if (marketName.includes('under over +2.5')) {
+        ouBookNumbers.push(market.marketBookNo.toString());
+        console.log(`   📋 O/U 2.5 BookNo collected: ${market.marketBookNo}`);
+      }
+      
+      // Look for BTTS markets
+      if (marketName.includes('both') || marketName.includes('score') || marketCode === 'BTTS') {
+        console.log(`   🎯 Found potential BTTS market: ${market.marketDisplayName}`);
+        this.extractBTTSOdds(market, oddsData);
+      }
+      
+      // Look for Over/Under markets
+      if (marketName.includes('total') || marketName.includes('over') || marketName.includes('under') || 
+          marketName.includes('goals') || marketCode === 'OU' || marketCode === 'TG') {
+        console.log(`   🎯 Found potential Over/Under market: ${market.marketDisplayName}`);
+        this.extractOverUnderOdds(market, oddsData);
+      }
+      
+      // Log all selections for analysis
+      if (market.selectionList && Array.isArray(market.selectionList)) {
+        market.selectionList.forEach((selection: any, selIndex: number) => {
+          console.log(`     Selection ${selIndex + 1}: ${selection.name} = ${selection.companyOdds}`);
+        });
+      }
+    });
+    
+    // Power Query equivalent: Text.Combine(List.Transform(_, Text.From))
+    const combinedBTTSBookNos = bttsBookNumbers.join(',');
+    const combinedOUBookNos = ouBookNumbers.join(',');
+    
+    console.log(`📋 Power Query BTTS BookNos: "${combinedBTTSBookNos}"`);
+    console.log(`📋 Power Query O/U BookNos: "${combinedOUBookNos}"`);
+    
+    // Store Power Query compatible data
+    if (!oddsData.additionalOdds) {
+      oddsData.additionalOdds = {};
+    }
+    oddsData.additionalOdds['BookNoBTTS'] = combinedBTTSBookNos;
+    oddsData.additionalOdds['BookNoOU'] = combinedOUBookNos;
+  }
+
+  private extractBTTSOdds(market: any, oddsData: MatchOddsData): void {
+    console.log(`   🎯 Processing BTTS market: "${market.marketDisplayName}" (Book: ${market.marketBookNo})`);
+    
+    // Power Query exact match: if [marketDisplayName] = "Both Team To Score "
+    const marketName = market.marketDisplayName || '';
+    
+    // Try exact Power Query match first
+    const isExactBTTSMatch = marketName === "Both Team To Score ";
+    
+    // Also try variations in case of encoding differences
+    const isBTTSVariation = marketName.trim() === "Both Team To Score" ||
+                           marketName === "Both Team To Score" ||
+                           marketName.includes("Both Team To Score");
+    
+    if (!isExactBTTSMatch && !isBTTSVariation) {
+      console.log(`   ⚠️ Skipping non-BTTS market: "${market.marketDisplayName}"`);
+      return;
+    }
+    
+    if (isExactBTTSMatch) {
+      console.log(`   ✅ EXACT Power Query match: "${marketName}"`);
+    } else {
+      console.log(`   ⚠️ Using BTTS variation: "${marketName}"`);
+    }
+    
+    // Store the market book number for Power Query compatibility
+    if (!oddsData.additionalOdds) {
+      oddsData.additionalOdds = {};
+    }
+    oddsData.additionalOdds[`BookNoBTTS_${market.marketBookNo}`] = market.marketBookNo;
     
     if (market.selectionList && Array.isArray(market.selectionList)) {
       market.selectionList.forEach((selection: any) => {
-        const oddsValue = parseFloat(selection.companyOdds);
+        const selectionName = selection.name?.toLowerCase() || '';
+        const odds = parseFloat(selection.companyOdds);
         
-        if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
+        console.log(`     Selection: "${selection.name}" = ${selection.companyOdds} (${odds})`);
+        
+        if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
+          // Use exact matching for BTTS selections
           if (selection.name === 'YES') {
-            oddsData.bttsYes = oddsValue;
-            console.log(`   ✅ BTTS Yes extracted: ${oddsValue}`);
+            oddsData.bttsYes = odds;
+            console.log(`   ✅ BTTS Yes extracted: ${odds}`);
           } else if (selection.name === 'NO') {
-            oddsData.bttsNo = oddsValue;
-            console.log(`   ✅ BTTS No extracted: ${oddsValue}`);
+            oddsData.bttsNo = odds;
+            console.log(`   ✅ BTTS No extracted: ${odds}`);
           }
         }
       });
     }
   }
 
-  private extractOverUnderFromMarket(market: any, oddsData: MatchOddsData): void {
-    console.log(`   🎯 Extracting Over/Under odds from market: "${market.marketDisplayName}"`);
+  private extractOverUnderOdds(market: any, oddsData: MatchOddsData): void {
+    const marketName = market.marketDisplayName?.toLowerCase() || '';
+    console.log(`   🎯 Processing O/U market: "${market.marketDisplayName}" (Book: ${market.marketBookNo})`);
     
+    // Only process the exact "Under Over +2.5" market
+    if (!market.marketDisplayName?.includes('+2.5')) {
+      console.log(`     Skipping non-2.5 market: "${market.marketDisplayName}"`);
+      return;
+    }
+    
+    // Store the market book number for Power Query compatibility
+    if (!oddsData.additionalOdds) {
+      oddsData.additionalOdds = {};
+    }
+    oddsData.additionalOdds[`BookNoOU_${market.marketBookNo}`] = market.marketBookNo;
+    
+    // Look for 2.5 goals markets specifically
+    console.log(`     Found 2.5 goals market: "${market.marketDisplayName}"`);
+      
     if (market.selectionList && Array.isArray(market.selectionList)) {
       market.selectionList.forEach((selection: any) => {
-        const oddsValue = parseFloat(selection.companyOdds);
+        const odds = parseFloat(selection.companyOdds);
         
-        if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
-          if (selection.name === 'Over') {
-            oddsData.over25 = oddsValue;
-            console.log(`   ✅ Over 2.5 extracted: ${oddsValue}`);
-          } else if (selection.name === 'Under') {
-            oddsData.under25 = oddsValue;
-            console.log(`   ✅ Under 2.5 extracted: ${oddsValue}`);
+        console.log(`     Selection: "${selection.name}" = ${selection.companyOdds} (${odds})`);
+        
+        if (!isNaN(odds) && odds >= 1.01 && odds <= 50) {
+          // Use exact matching for Over/Under selections
+          if (selection.name === 'Under') {
+            oddsData.under25 = odds;
+            console.log(`   ✅ Under 2.5 extracted: ${odds}`);
+          } else if (selection.name === 'Over') {
+            oddsData.over25 = odds;
+            console.log(`   ✅ Over 2.5 extracted: ${odds}`);
           }
         }
       });
     }
+  }
+
+  private extractFromNameValueArray(array: any[], oddsData: MatchOddsData): void {
+    console.log(`🔍 Processing ${array.length} Name/Value pairs...`);
+
+    array.forEach((item, index) => {
+      if (item && typeof item === 'object') {
+        const name = item.Name || item.name || item.key || item.type;
+        const value = item.Value || item.value || item.odds || item.price;
+
+        if (name && value) {
+          console.log(`   ${index}: "${name}" = "${value}"`);
+          this.mapOddsValue(name, value, oddsData);
+        }
+      }
+    });
+  }
+
+  private extractFromNestedStructure(data: any, oddsData: MatchOddsData): void {
+    console.log(`🔍 Searching nested structure for odds data...`);
+    
+    // Recursively search for Name/Value patterns
+    const searchObject = (obj: any, path: string = '') => {
+      if (typeof obj !== 'object' || obj === null) return;
+
+      Object.entries(obj).forEach(([key, value]) => {
+        const currentPath = path ? `${path}.${key}` : key;
+        
+        if (Array.isArray(value)) {
+          // Check if this array contains Name/Value pairs
+          if (value.length > 0 && value[0] && typeof value[0] === 'object') {
+            const firstItem = value[0];
+            if ((firstItem.Name || firstItem.name) && (firstItem.Value || firstItem.value)) {
+              console.log(`📋 Found Name/Value array at ${currentPath}`);
+              this.extractFromNameValueArray(value, oddsData);
+            }
+          }
+        } else if (typeof value === 'object') {
+          searchObject(value, currentPath);
+        }
+      });
+    };
+
+    searchObject(data);
+  }
+
+  private mapOddsValue(name: string, value: string, oddsData: MatchOddsData): void {
+    const nameLower = name.toLowerCase();
+    const numericValue = parseFloat(value);
+
+    if (isNaN(numericValue) || numericValue < 1.01 || numericValue > 50) {
+      return; // Invalid odds value
+    }
+
+    // Map common BTTS patterns
+    if (nameLower.includes('btts') || nameLower.includes('both') || nameLower.includes('score')) {
+      if (nameLower.includes('yes') || nameLower.includes('true') || nameLower === 'btts') {
+        oddsData.bttsYes = numericValue;
+        console.log(`   🎯 BTTS Yes: ${numericValue}`);
+      } else if (nameLower.includes('no') || nameLower.includes('false')) {
+        oddsData.bttsNo = numericValue;
+        console.log(`   🎯 BTTS No: ${numericValue}`);
+      }
+    }
+
+    // Map Over/Under patterns
+    if (nameLower.includes('over') || nameLower.includes('total')) {
+      if (nameLower.includes('2.5') || nameLower.includes('25') || nameLower === 'over') {
+        oddsData.over25 = numericValue;
+        console.log(`   🎯 Over 2.5: ${numericValue}`);
+      }
+    }
+
+    if (nameLower.includes('under')) {
+      if (nameLower.includes('2.5') || nameLower.includes('25') || nameLower === 'under') {
+        oddsData.under25 = numericValue;
+        console.log(`   🎯 Under 2.5: ${numericValue}`);
+      }
+    }
+
+    // Store all additional odds for analysis
+    if (!oddsData.additionalOdds) {
+      oddsData.additionalOdds = {};
+    }
+    oddsData.additionalOdds[name] = numericValue;
+  }
+
+  async extractOddsForMatches(matches: Array<{id: string, competitionId?: string}>): Promise<Map<string, MatchOddsData>> {
+    const oddsMap = new Map<string, MatchOddsData>();
+    
+    console.log(`🚀 Starting detailed odds extraction for ${matches.length} matches...`);
+
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      
+      // Extract competition ID from match data or use default
+      const competitionId = match.competitionId || this.extractCompetitionFromMatchId(match.id);
+      
+      if (competitionId) {
+        const odds = await this.extractMatchOdds(match.id, competitionId);
+        if (odds) {
+          oddsMap.set(match.id, odds);
+          console.log(`✅ ${i + 1}/${matches.length}: Got odds for match ${match.id}`);
+        } else {
+          console.log(`⚠️ ${i + 1}/${matches.length}: No odds for match ${match.id}`);
+        }
+      }
+
+      // Progress update every 10 matches
+      if ((i + 1) % 10 === 0) {
+        console.log(`📊 Progress: ${i + 1}/${matches.length} matches processed`);
+      }
+    }
+
+    console.log(`🎯 Extraction complete: ${oddsMap.size}/${matches.length} matches have detailed odds`);
+    return oddsMap;
+  }
+
+  private extractCompetitionFromMatchId(matchId: string): string | null {
+    // Based on your data, try to map match IDs to competition IDs
+    const competitionMappings = {
+      '227932': '81',  // Austria Cup
+      '227369': '126', // EFL Cup  
+      '227375': '163', // La Liga
+      '227365': '50',  // Champions League
+      '227499': '55',  // Conference League
+      '227368': '135', // Europa League
+    };
+
+    return competitionMappings[matchId as keyof typeof competitionMappings] || null;
   }
 
   private async enforceRateLimit(): Promise<void> {
