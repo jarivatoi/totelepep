@@ -113,6 +113,45 @@ class TotelepepExtractor {
     return jsonData;
   }
 
+  private extractCompetitionMap(jsonData: any): Map<string, string> {
+    const competitionMap = new Map<string, string>();
+    
+    try {
+      console.log('🏆 Extracting competition map from API response...');
+      
+      // Check if competitionData exists in the API response
+      if (jsonData && jsonData.competitionData && typeof jsonData.competitionData === 'string') {
+        console.log(`📊 Found competitionData string with ${jsonData.competitionData.length} characters`);
+        
+        // Parse the pipe-delimited competition data
+        const competitionEntries = jsonData.competitionData.split('|').filter((entry: string) => entry.trim());
+        console.log(`🔍 Found ${competitionEntries.length} competition entries`);
+        
+        for (const entry of competitionEntries) {
+          const fields = entry.split(';');
+          if (fields.length >= 2) {
+            const competitionId = fields[0]?.trim();
+            const competitionName = fields[1]?.trim();
+            
+            if (competitionId && competitionName) {
+              competitionMap.set(competitionId, competitionName);
+              console.log(`🏆 Mapped competition: ${competitionId} → ${competitionName}`);
+            }
+          }
+        }
+      } else {
+        console.warn('⚠️ No competitionData found in API response');
+      }
+      
+      console.log(`✅ Competition map created with ${competitionMap.size} entries`);
+      
+    } catch (error) {
+      console.error('❌ Error extracting competition map:', error);
+    }
+    
+    return competitionMap;
+  }
+
   private parseJSONForMatches(jsonData: any): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
