@@ -193,6 +193,7 @@ class TotelepepExtractor {
   }
 
   private parseTotelepepMatchData(matchDataString: string): TotelepepMatch[] {
+  private parseTotelepepMatchData(matchDataString: string, competitionMap: Map<string, string>): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
     try {
@@ -224,7 +225,7 @@ class TotelepepExtractor {
       
       for (let i = 0; i < matchEntries.length; i++) {
         const entry = matchEntries[i];
-        const match = this.parseTotelepepMatchEntry(entry, i);
+        const match = this.parseTotelepepMatchEntry(entry, i, competitionMap);
         if (match) {
           matches.push(match);
           console.log(`✅ Parsed: ${match.homeTeam} vs ${match.awayTeam} (${match.homeOdds}/${match.drawOdds}/${match.awayOdds})`);
@@ -328,14 +329,17 @@ class TotelepepExtractor {
       
       // Use league name from API competitionMap first, then fallback to hardcoded mapping
       let league = competitionMap?.get(competitionId);
+      let leagueSource = 'fallback';
+      
       if (!league) {
         league = this.getLeagueFromCompetitionId(competitionId);
+        leagueSource = league ? 'mapping' : 'fallback';
       }
       if (!league) {
         league = `Competition ${competitionId}`;
       }
       
-      console.log(`🏆 Match ${matchId}: Competition ID "${competitionId}" → League "${league}" (from ${competitionMap?.has(competitionId) ? 'API' : 'mapping'})`);
+      console.log(`🏆 Match ${matchId}: Competition ID "${competitionId}" → League "${league}" (source: ${competitionMap?.has(competitionId) ? 'API' : leagueSource})`);
       
       const match: TotelepepMatch = {
         id: matchId,
