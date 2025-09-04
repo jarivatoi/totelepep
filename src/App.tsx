@@ -306,19 +306,19 @@ function App() {
                 onClick={() => {
                   console.log('🔍 Manual extraction triggered');
                   // Force fresh extraction by clearing cache first
-                  if (window.totelepepExtractor) {
-                    window.totelepepExtractor.clearCache();
+                  if ((window as any).totelepepExtractor) {
+                    (window as any).totelepepExtractor.clearCache();
                   }
                   // Also clear match-specific cache
-                  if (window.matchSpecificExtractor) {
-                    window.matchSpecificExtractor.clearCache();
+                  if ((window as any).matchSpecificExtractor) {
+                    (window as any).matchSpecificExtractor.clearCache();
                   }
                   loadData(selectedDate);
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"
               >
                 <Database className="w-4 h-4" />
-                Extract with REAL Totelepep Odds
+                Extract with Power Query Method
               </button>
             </div>
           </div>
