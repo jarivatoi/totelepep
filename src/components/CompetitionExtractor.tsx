@@ -53,7 +53,7 @@ const CompetitionExtractor: React.FC = () => {
             console.log(`📊 Raw competitionData for ${date}:`, data.competitionData);
             setRawData(prev => prev + `\n=== ${date} ===\n${data.competitionData}\n`);
             
-            const competitions = this.parseCompetitionData(data.competitionData);
+            const competitions = parseCompetitionData(data.competitionData);
             competitions.forEach(comp => {
               if (!allCompetitions.has(comp.id)) {
                 allCompetitions.set(comp.id, comp);
@@ -67,7 +67,7 @@ const CompetitionExtractor: React.FC = () => {
 
           // Also extract from matchData to get competition IDs
           if (data.matchData) {
-            const matchCompetitions = this.extractCompetitionsFromMatches(data.matchData);
+            const matchCompetitions = extractCompetitionsFromMatches(data.matchData);
             matchCompetitions.forEach(comp => {
               if (!allCompetitions.has(comp.id)) {
                 allCompetitions.set(comp.id, { ...comp, name: `Competition ${comp.id}` });
