@@ -189,6 +189,7 @@ function App() {
             <DateSelector
               selectedDate={selectedDate}
               onDateChange={handleDateChange}
+              groupedMatches={groupedMatches}
             />
             
         <div className="mb-8">
