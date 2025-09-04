@@ -205,6 +205,13 @@ function App() {
               </h1>
               <div className="flex items-center gap-4 mb-2">
                 <button
+                  onClick={() => setShowCompetitionExtractor(!showCompetitionExtractor)}
+                  className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                >
+                  <Database className="w-4 h-4" />
+                  {showCompetitionExtractor ? 'Hide' : 'Show'} Competition Extractor
+                </button>
+                <button
                   onClick={() => setShowExtractor(!showExtractor)}
                   className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
                 >
@@ -252,13 +259,6 @@ function App() {
                 >
                   <Search className="w-4 h-4" />
                   {showBookingGuide ? 'Hide' : 'Show'} Booking Discovery Guide
-                </button>
-                <button
-                  onClick={() => setShowCompetitionExtractor(!showCompetitionExtractor)}
-                  className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                >
-                  <Database className="w-4 h-4" />
-                  {showCompetitionExtractor ? 'Hide' : 'Show'} Competition Extractor
                 </button>
               </div>
               <p className="text-gray-600">
