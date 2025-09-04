@@ -81,7 +81,14 @@ const MatchTable: React.FC<MatchTableProps> = ({
                   <div className="font-semibold text-gray-900">
                     {match.homeTeam} vs {match.awayTeam}
                   </div>
-                  <div className="text-sm text-gray-600">{match.league}</div>
+                  <div className="text-sm text-gray-600">
+                    {match.league}
+                    {match.competitionId && (
+                      <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                        ID: {match.competitionId}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-sm text-gray-500">
                     {showDate && match.date && (
                       <span className="mr-2">{new Date(match.date).toLocaleDateString('en-GB')}</span>

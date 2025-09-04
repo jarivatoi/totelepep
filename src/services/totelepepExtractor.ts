@@ -280,9 +280,17 @@ class TotelepepExtractor {
       
       // Get competition name from competitionData if available
       const competitionId = fields[1];
-      const marketBookNo = fields[15]; // Extract marketBookNo from field 15
-      const marketCode = fields[16]; // Extract marketCode from field 16
+      const marketBookNo = fields[15] || ''; // Extract marketBookNo from field 15
+      const marketCode = fields[16] || 'CP'; // Extract marketCode from field 16
       const league = this.getLeagueFromCompetitionId(competitionId) || 'Football League';
+      
+      console.log(`🏆 Match ${matchId} competition data:`, {
+        competitionId,
+        marketBookNo,
+        marketCode,
+        league,
+        allFields: fields.slice(0, 20) // Show first 20 fields for debugging
+      });
       
       const match: TotelepepMatch = {
         id: matchId,
@@ -561,20 +569,26 @@ class TotelepepExtractor {
   }
 
   private getLeagueFromCompetitionId(competitionId: string): string | null {
-    // This would map competition IDs to league names
-    // For now, return a generic name
+    // Map competition IDs to proper league names based on Totelepep data
     const competitionMap: Record<string, string> = {
       '81': 'Austria - OFB Cup',
-      '234': 'Croatia - Croatian Cup',
-      '112': 'Czechia - Czech Cup',
-      '35': 'Egypt - Premier League',
       '126': 'England - EFL Cup',
-      '138': 'Germany - DFB Pokal',
+      '163': 'Spain - LaLiga',
       '50': 'UEFA Champions League',
-      '17': 'Iran - Pro League'
+      '55': 'UEFA Conference League',
+      '135': 'UEFA Europa League',
+      '52': 'Japan - Emperor Cup',
+      '38': 'Lithuania - A Lyga',
+      '112': 'Czechia - Czech Cup',
+      '17': 'Iran - Pro League',
+      '35': 'Egypt - Premier League',
+      '138': 'Germany - DFB Pokal',
+      '234': 'Croatia - Croatian Cup'
     };
     
-    return competitionMap[competitionId] || null;
+    const leagueName = competitionMap[competitionId];
+    console.log(`🏆 Competition ${competitionId} mapped to: ${leagueName || 'Unknown League'}`);
+    return leagueName || `Competition ${competitionId}`;
   }
 
   private convertAPIMatchToTotelepepMatch(apiMatch: any, index: number): TotelepepMatch | null {
