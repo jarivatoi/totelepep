@@ -138,7 +138,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
                   <div className={`text-xs mt-1 px-2 py-0.5 rounded-full ${
                     isSelected ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-600'
                   }`}>
-                    {dateInfo.matchCount} matches
+                    {dateInfo.matchCount}
                   </div>
                 )}
               </div>
