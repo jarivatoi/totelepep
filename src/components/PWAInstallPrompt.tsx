@@ -62,7 +62,7 @@ const PWAInstallPrompt: React.FC = () => {
           <Download className="w-5 h-5 text-blue-600" />
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">Install Totelepep App</h3>
+          <h3 className="font-semibold text-gray-900 mb-1">Install Totelepep</h3>
           <p className="text-sm text-gray-600 mb-3">
             Get faster access and offline support by installing our app
           </p>
