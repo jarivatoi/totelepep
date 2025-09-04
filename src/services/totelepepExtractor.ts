@@ -282,7 +282,9 @@ class TotelepepExtractor {
       const competitionId = fields[1];
       const marketBookNo = fields[15]; // Extract marketBookNo from field 15
       const marketCode = fields[16]; // Extract marketCode from field 16
-      const league = this.getLeagueFromCompetitionId(competitionId) || 'Football League';
+      const league = this.getLeagueFromCompetitionId(competitionId) || `Competition ${competitionId}`;
+      
+      console.log(`🏆 Match ${matchId}: Competition ID "${competitionId}" → League "${league}"`);
       
       const match: TotelepepMatch = {
         id: matchId,
@@ -561,17 +563,49 @@ class TotelepepExtractor {
   }
 
   private getLeagueFromCompetitionId(competitionId: string): string | null {
-    // This would map competition IDs to league names
-    // For now, return a generic name
+    // Map competition IDs to actual league names from Totelepep
     const competitionMap: Record<string, string> = {
+      // International competitions
+      '1': 'International - Int. Friendly Games',
+      '2': 'International - World Cup Qualifiers',
+      '3': 'International - UEFA Nations League',
+      '4': 'International - European Championship',
+      '5': 'International - Copa America',
+      '6': 'International - African Cup of Nations',
+      '7': 'International - Asian Cup',
+      
+      // Club competitions
+      '50': 'UEFA Champions League',
+      '55': 'UEFA Conference League',
+      '135': 'UEFA Europa League',
+      
+      // Domestic leagues
       '81': 'Austria - OFB Cup',
+      '126': 'England - EFL Cup',
+      '127': 'England - Premier League',
+      '128': 'England - Championship',
+      '129': 'England - League One',
+      '130': 'England - League Two',
+      '131': 'England - FA Cup',
+      '138': 'Germany - DFB Pokal',
+      '139': 'Germany - Bundesliga',
+      '163': 'Spain - LaLiga',
+      '164': 'Spain - Copa del Rey',
+      '180': 'Italy - Serie A',
+      '181': 'Italy - Coppa Italia',
+      '200': 'France - Ligue 1',
+      '201': 'France - Coupe de France',
+      
+      // Other countries
       '234': 'Croatia - Croatian Cup',
       '112': 'Czechia - Czech Cup',
       '35': 'Egypt - Premier League',
-      '126': 'England - EFL Cup',
-      '138': 'Germany - DFB Pokal',
-      '50': 'UEFA Champions League',
-      '17': 'Iran - Pro League'
+      '17': 'Iran - Pro League',
+      '38': 'Lithuania - A Lyga',
+      '52': 'Japan - Emperor Cup',
+      
+      // Add more as needed based on actual data
+      '0': 'International - Int. Friendly Games' // Default for competitionId=0
     };
     
     return competitionMap[competitionId] || null;
