@@ -122,6 +122,10 @@ class TotelepepExtractor {
       console.log('📊 Response type:', typeof jsonData);
       console.log('📊 Response keys:', Object.keys(jsonData || {}));
       
+      // Extract competition data for league names
+      const competitionMap = this.extractCompetitionMap(jsonData);
+      console.log('🏆 Competition map extracted:', competitionMap);
+      
       // Parse JSON structure (equivalent to Power Query Json.Document)
       // Totelepep uses a special matchData field with pipe-delimited format
       if (jsonData && jsonData.matchData && typeof jsonData.matchData === 'string') {
@@ -129,7 +133,7 @@ class TotelepepExtractor {
         console.log(`📄 Sample matchData: ${jsonData.matchData.substring(0, 200)}...`);
         
         // Parse the pipe-delimited match data
-        const parsedMatches = this.parseTotelepepMatchData(jsonData.matchData);
+        const parsedMatches = this.parseTotelepepMatchData(jsonData.matchData, competitionMap);
         matches.push(...parsedMatches);
         
         console.log(`✅ Parsed ${parsedMatches.length} matches from matchData`);
