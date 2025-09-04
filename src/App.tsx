@@ -14,6 +14,7 @@ import AlternativeSolutions from './components/AlternativeSolutions';
 import MatchSpecificTester from './components/MatchSpecificTester';
 import BetPlacementAnalyzer from './components/BetPlacementAnalyzer';
 import BookingDiscoveryGuide from './components/BookingDiscoveryGuide';
+import CompetitionExtractor from './components/CompetitionExtractor';
 import { totelepepService, TotelepepMatch } from './services/totelepepService';
 import { registerServiceWorker, requestNotificationPermission, scheduleBackgroundSync } from './utils/pwaUtils';
 import { usePWA } from './hooks/usePWA';
@@ -33,6 +34,7 @@ function App() {
   const [showMatchTester, setShowMatchTester] = useState(false);
   const [showBetAnalyzer, setShowBetAnalyzer] = useState(false);
   const [showBookingGuide, setShowBookingGuide] = useState(false);
+  const [showCompetitionExtractor, setShowCompetitionExtractor] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
   const { isOnline } = usePWA();
@@ -251,6 +253,13 @@ function App() {
                   <Search className="w-4 h-4" />
                   {showBookingGuide ? 'Hide' : 'Show'} Booking Discovery Guide
                 </button>
+                <button
+                  onClick={() => setShowCompetitionExtractor(!showCompetitionExtractor)}
+                  className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                >
+                  <Database className="w-4 h-4" />
+                  {showCompetitionExtractor ? 'Hide' : 'Show'} Competition Extractor
+                </button>
               </div>
               <p className="text-gray-600">
                 Last updated: {lastUpdated.toLocaleTimeString()} • {selectedDate} {!isOnline && '(Offline)'}
@@ -351,6 +360,10 @@ function App() {
           
           {showBookingGuide && (
             <BookingDiscoveryGuide />
+          )}
+          
+          {showCompetitionExtractor && (
+            <CompetitionExtractor />
           )}
           
           {searchTerm && (
