@@ -37,56 +37,6 @@ function App() {
   
   const { isOnline } = usePWA();
 
-  // Load data for multiple dates to show match counts
-  const loadDataForAllDates = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      console.log('🔍 Loading data for next 7 days...');
-      const allMatches: TotelepepMatch[] = [];
-      const today = new Date();
-      
-      // Load data for next 7 days
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() + i);
-        const dateString = date.toISOString().split('T')[0];
-        
-        try {
-          console.log(`📅 Fetching data for ${dateString}...`);
-          const dayMatches = await totelepepService.getMatches(dateString);
-          allMatches.push(...dayMatches);
-          console.log(`✅ Found ${dayMatches.length} matches for ${dateString}`);
-          
-          // Small delay between requests
-          if (i < 6) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        } catch (error) {
-          console.warn(`⚠️ Failed to load data for ${dateString}:`, error);
-        }
-      }
-      
-      // Sort all matches by date and time
-      const sortedMatches = totelepepService.sortMatchesByDate(allMatches);
-      setMatches(sortedMatches);
-      
-      // Group matches by date
-      const grouped = totelepepService.groupMatchesByDate(sortedMatches);
-      setGroupedMatches(grouped);
-      
-      setLastUpdated(new Date());
-      console.log(`✅ Loaded ${sortedMatches.length} total matches across 7 days`);
-      
-    } catch (error) {
-      console.error('Error loading multi-day data:', error);
-      setError(isOnline ? 'Failed to load data from Totelepep. Try the data extractor below.' : 'You are offline. Showing cached data if available.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Initialize PWA features
   useEffect(() => {
     registerServiceWorker();
@@ -128,7 +78,7 @@ function App() {
 
   // Load data only on initial mount
   useEffect(() => {
-    loadDataForAllDates();
+    loadData(selectedDate);
   }, []); // Empty dependency array - only runs once on mount
 
   // Filter matches and maintain grouping
@@ -239,7 +189,6 @@ function App() {
             <DateSelector
               selectedDate={selectedDate}
               onDateChange={handleDateChange}
-              groupedMatches={groupedMatches}
             />
             
         <div className="mb-8">
@@ -350,16 +299,7 @@ function App() {
                 }`}
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Loading...' : isOnline ? 'Refresh Current Date' : 'Offline'}
-              </button>
-              
-              <button
-                onClick={loadDataForAllDates}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Calendar className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Loading All...' : 'Load All 7 Days'}
+                {loading ? 'Loading...' : isOnline ? 'Refresh Data' : 'Offline'}
               </button>
               
               <button
@@ -373,7 +313,7 @@ function App() {
                   if (window.matchSpecificExtractor) {
                     window.matchSpecificExtractor.clearCache();
                   }
-                  loadDataForAllDates();
+                  loadData(selectedDate);
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 transform hover:scale-105 active:scale-95"
               >

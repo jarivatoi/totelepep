@@ -4,16 +4,16 @@ import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 interface DateSelectorProps {
   selectedDate: string;
   onDateChange: (date: string) => void;
-  groupedMatches?: Record<string, any[]>;
+  availableDates?: Array<{ date: string; matchCount: number; displayName: string }>;
 }
 
 const DateSelector: React.FC<DateSelectorProps> = ({ 
   selectedDate, 
   onDateChange, 
-  groupedMatches = {}
+  availableDates = [] 
 }) => {
-  // Generate next 7 days with match counts
-  const getDateTabs = () => {
+  // Generate next 7 days if no available dates provided
+  const getDefaultDates = () => {
     const dates = [];
     const today = new Date();
     
@@ -27,19 +27,16 @@ const DateSelector: React.FC<DateSelectorProps> = ({
       else if (i === 1) displayName = 'Tomorrow';
       else displayName = date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
       
-      // Get match count for this date
-      const matchCount = groupedMatches[dateString]?.length || 0;
-      
       dates.push({
         date: dateString,
-        matchCount,
+        matchCount: 0,
         displayName
       });
     }
     return dates;
   };
 
-  const datesToShow = getDateTabs();
+  const datesToShow = availableDates.length > 0 ? availableDates : getDefaultDates();
   
   const currentIndex = datesToShow.findIndex(d => d.date === selectedDate);
   
@@ -131,12 +128,13 @@ const DateSelector: React.FC<DateSelectorProps> = ({
                 <div className={`text-xs ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
                   {date.getDate()}/{date.getMonth() + 1}
                 </div>
-                <div className={`text-xs mt-1 px-2 py-0.5 rounded-full ${
-                  isSelected ? 'bg-blue-500 text-white' : 
-                  dateInfo.matchCount > 0 ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {dateInfo.matchCount} {dateInfo.matchCount === 1 ? 'match' : 'matches'}
-                </div>
+                {dateInfo.matchCount > 0 && (
+                  <div className={`text-xs mt-1 px-2 py-0.5 rounded-full ${
+                    isSelected ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-600'
+                  }`}>
+                    {dateInfo.matchCount} matches
+                  </div>
+                )}
               </div>
             </button>
           );
