@@ -243,7 +243,7 @@ class TotelepepExtractor {
     return allOdds;
   }
 
-  private parseTotelepepMatchEntry(entry: string, index: number): TotelepepMatch | null {
+  private parseTotelepepMatchEntry(entry: string, index: number, competitionMap?: Map<string, string>): TotelepepMatch | null {
     try {
       // Split by semicolon to get match fields
       const fields = entry.split(';');
@@ -286,9 +286,17 @@ class TotelepepExtractor {
       const competitionId = fields[1];
       const marketBookNo = fields[15]; // Extract marketBookNo from field 15
       const marketCode = fields[16]; // Extract marketCode from field 16
-      const league = this.getLeagueFromCompetitionId(competitionId) || `Competition ${competitionId}`;
       
-      console.log(`🏆 Match ${matchId}: Competition ID "${competitionId}" → League "${league}"`);
+      // Use league name from API competitionMap first, then fallback to hardcoded mapping
+      let league = competitionMap?.get(competitionId);
+      if (!league) {
+        league = this.getLeagueFromCompetitionId(competitionId);
+      }
+      if (!league) {
+        league = `Competition ${competitionId}`;
+      }
+      
+      console.log(`🏆 Match ${matchId}: Competition ID "${competitionId}" → League "${league}" (from ${competitionMap?.has(competitionId) ? 'API' : 'mapping'})`);
       
       const match: TotelepepMatch = {
         id: matchId,
