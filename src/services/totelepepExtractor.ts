@@ -78,46 +78,24 @@ class TotelepepExtractor {
   private async extractUsingPowerQueryMethod(targetDate?: string): Promise<TotelepepMatch[]> {
     console.log('🎯 Using Power Query extraction method...');
     
-    // Step 1: Get competitions data (like Power Query)
-    const competitions = await this.getCompetitionsData(targetDate);
-    console.log(`📊 Found ${competitions.length} competitions`);
+    // Step 1: Get raw table data (like Power Query)
+    const rawTableData = await this.getRawTableData(targetDate);
+    console.log(`📊 Raw table data extracted`);
     
-    const allMatches: TotelepepMatch[] = [];
-    
-    // Step 2: For each competition, get detailed match data
-    for (const competition of competitions) {
-      try {
-        console.log(`🔍 Processing competition ${competition.id}: ${competition.name}`);
-        
-        const competitionMatches = await this.getCompetitionMatches(
-          competition.id, 
-          targetDate
-        );
-        
-        if (competitionMatches.length > 0) {
-          console.log(`✅ Found ${competitionMatches.length} matches in ${competition.name}`);
-          allMatches.push(...competitionMatches);
-        }
-        
-        // Rate limiting between competitions
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-      } catch (error) {
-        console.warn(`⚠️ Error processing competition ${competition.id}:`, error);
-      }
-    }
+    // Step 2: Parse table structure to extract matches
+    const allMatches = this.parseTableStructure(rawTableData, targetDate);
     
     console.log(`🎯 Total matches extracted: ${allMatches.length}`);
     return this.deduplicateAndValidate(allMatches);
   }
 
-  private async getCompetitionsData(targetDate?: string): Promise<Array<{id: string, name: string}>> {
+  private async getRawTableData(targetDate?: string): Promise<any> {
     const dateToFetch = targetDate || this.getTodayDate();
     
-    // Use the same endpoint as Power Query to get competitions
+    // Use the same endpoint as Power Query to get raw table data
     const apiUrl = `${this.baseUrl}/GetSport?sportId=soccer&date=${dateToFetch}&category=&competitionId=0&pageNo=200&inclusive=1&matchid=0&periodCode=all`;
     
-    console.log(`🌐 Getting competitions from: ${apiUrl}`);
+    console.log(`🌐 Getting raw table data from: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {
       headers: {
@@ -136,9 +114,44 @@ class TotelepepExtractor {
     const data = await response.json();
     console.log('📄 Competitions response:', data);
     
-    // Extract competitions from the response
+    return data;
+  }
+
+  private parseTableStructure(data: any, targetDate: string): TotelepepMatch[] {
+    console.log('🔧 Parsing table structure like Power Query...');
+    
+    const allMatches: TotelepepMatch[] = [];
+    
+    // Step 1: Extract competitions from table (like Power Query Table.ExpandTableColumn)
+    const competitions = this.extractCompetitionsFromTable(data);
+    console.log(`📊 Found ${competitions.length} competitions from table`);
+    
+    // Step 2: For each competition, extract matches from table structure
+    competitions.forEach(competition => {
+      try {
+        console.log(`🔍 Processing competition ${competition.id}: ${competition.name}`);
+        
+        const competitionMatches = this.extractMatchesFromCompetition(competition, data, targetDate);
+        
+        if (competitionMatches.length > 0) {
+          console.log(`✅ Found ${competitionMatches.length} matches in ${competition.name}`);
+          allMatches.push(...competitionMatches);
+        }
+        
+      } catch (error) {
+        console.warn(`⚠️ Error processing competition ${competition.id}:`, error);
+      }
+    });
+    
+    return allMatches;
+  }
+
+  private extractCompetitionsFromTable(data: any): Array<{id: string, name: string}> {
     const competitions: Array<{id: string, name: string}> = [];
     
+    console.log('📊 Extracting competitions from table structure...');
+    
+    // Power Query: Extract from competitions array in response
     if (data.competitions && Array.isArray(data.competitions)) {
       data.competitions.forEach((comp: any) => {
         if (comp.id && comp.name) {
@@ -150,7 +163,7 @@ class TotelepepExtractor {
       });
     }
     
-    // If no competitions found, extract from competitionData string (like Power Query)
+    // Power Query: Also extract from competitionData string if available
     if (competitions.length === 0 && data.competitionData) {
       console.log('📊 Parsing competitionData string...');
       const competitionEntries = data.competitionData.split('|').filter((entry: string) => entry.trim());
@@ -170,84 +183,37 @@ class TotelepepExtractor {
     return competitions;
   }
 
-  private async getCompetitionMatches(competitionId: string, targetDate?: string): Promise<TotelepepMatch[]> {
-    const dateToFetch = targetDate || this.getTodayDate();
-    
-    // Use the exact Power Query endpoint: /webapi/GetMatch
-    const apiUrl = `${this.baseUrl}/GetMatch?sportId=soccer&competitionId=${competitionId}&matchId=0&periodCode=all&date=${dateToFetch}`;
-    
-    console.log(`🔍 Getting matches for competition ${competitionId}: ${apiUrl}`);
-    
-    try {
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-
-      if (!response.ok) {
-        console.warn(`⚠️ Competition ${competitionId} returned ${response.status}: ${response.statusText}`);
-        return [];
-      }
-
-      const data = await response.json();
-      console.log(`📄 Competition ${competitionId} response:`, data);
-
-      // Parse the response using Power Query logic
-      return this.parseCompetitionResponse(data, competitionId, dateToFetch);
-
-    } catch (error) {
-      console.error(`❌ Error fetching competition ${competitionId}:`, error);
-      return [];
-    }
-  }
-
-  private parseCompetitionResponse(data: any, competitionId: string, date: string): TotelepepMatch[] {
+  private extractMatchesFromCompetition(competition: any, tableData: any, targetDate: string): TotelepepMatch[] {
     const matches: TotelepepMatch[] = [];
     
-    console.log(`🔧 Parsing competition ${competitionId} response...`);
+    console.log(`🔧 Extracting matches from competition ${competition.id} table data...`);
     
-    // Power Query equivalent: Navigate to competitions -> matches
-    if (data.competitions && Array.isArray(data.competitions)) {
-      data.competitions.forEach((competition: any) => {
-        if (competition.matches && Array.isArray(competition.matches)) {
-          console.log(`📊 Found ${competition.matches.length} matches in competition structure`);
-          
-          competition.matches.forEach((match: any) => {
-            const parsedMatch = this.parseMatchFromAPI(match, competitionId, date);
-            if (parsedMatch) {
-              matches.push(parsedMatch);
-            }
-          });
-        }
-      });
-    }
-    
-    // Also check for direct matches array
-    if (data.matches && Array.isArray(data.matches)) {
-      console.log(`📊 Found ${data.matches.length} matches in direct matches array`);
+    // Power Query: Look for matches in the table structure
+    if (tableData.competitions && Array.isArray(tableData.competitions)) {
+      const targetCompetition = tableData.competitions.find((comp: any) => 
+        comp.id?.toString() === competition.id
+      );
       
-      data.matches.forEach((match: any) => {
-        const parsedMatch = this.parseMatchFromAPI(match, competitionId, date);
-        if (parsedMatch) {
-          matches.push(parsedMatch);
-        }
-      });
+      if (targetCompetition && targetCompetition.matches && Array.isArray(targetCompetition.matches)) {
+        console.log(`📊 Found ${targetCompetition.matches.length} matches in table for competition ${competition.id}`);
+        
+        targetCompetition.matches.forEach((match: any) => {
+          const parsedMatch = this.parseMatchFromTable(match, competition, targetDate);
+          if (parsedMatch) {
+            matches.push(parsedMatch);
+          }
+        });
+      }
     }
     
-    console.log(`✅ Parsed ${matches.length} matches from competition ${competitionId}`);
     return matches;
   }
 
-  private parseMatchFromAPI(match: any, competitionId: string, date: string): TotelepepMatch | null {
+  private parseMatchFromTable(match: any, competition: any, date: string): TotelepepMatch | null {
     try {
-      console.log(`🔍 Parsing match:`, match);
+      console.log(`🔍 Parsing match from table:`, match);
       
-      // Extract basic match info
+      // Extract basic match info from table
       const matchId = match.id?.toString() || match.matchId?.toString();
       const homeTeam = match.homeTeam || match.home || match.participant1;
       const awayTeam = match.awayTeam || match.away || match.participant2;
@@ -258,18 +224,15 @@ class TotelepepExtractor {
         return null;
       }
       
-      // Extract odds from markets (Power Query equivalent: Table.ExpandTableColumn)
-      const odds = this.extractOddsFromMarkets(match.markets || []);
-      
-      // Get competition name
-      const league = this.getCompetitionName(competitionId);
+      // Power Query: Extract odds from markets using Table.AddColumn approach
+      const odds = this.extractOddsUsingPowerQueryMethod(match.markets || []);
       
       const totelepepMatch: TotelepepMatch = {
         id: matchId,
         homeTeam: homeTeam.trim(),
         awayTeam: awayTeam.trim(),
-        league,
-        competitionId,
+        league: competition.name,
+        competitionId: competition.id,
         marketBookNo: match.marketBookNo?.toString(),
         marketCode: match.marketCode,
         kickoff: this.formatTime(kickoff),
@@ -301,12 +264,12 @@ class TotelepepExtractor {
       return totelepepMatch;
       
     } catch (error) {
-      console.warn('⚠️ Error parsing match:', error, match);
+      console.warn('⚠️ Error parsing match from table:', error, match);
       return null;
     }
   }
 
-  private extractOddsFromMarkets(markets: any[]): any {
+  private extractOddsUsingPowerQueryMethod(markets: any[]): any {
     const odds: any = {
       home: null,
       draw: null,
@@ -320,46 +283,47 @@ class TotelepepExtractor {
       bttsNo: null
     };
     
-    console.log(`🎯 Extracting odds from ${markets.length} markets using Power Query method...`);
+    console.log(`🎯 Extracting odds using Power Query method from ${markets.length} markets...`);
+    
+    // Power Query: List.Transform([markets], each if [marketDisplayName] = "..." then ...)
+    const matches: TotelepepMatch[] = [];
     
     markets.forEach((market: any, index: number) => {
-      const marketName = market.marketDisplayName?.toLowerCase() || '';
       const exactMarketName = market.marketDisplayName || '';
-      
       console.log(`   Market ${index + 1}: "${exactMarketName}" (${market.marketCode})`);
       
-      // Power Query: "1 X 2" market (Full Time)
+      // Power Query: if [marketDisplayName] = "1 X 2" then Number.FromText(Record.Field([selectionList]{0},"companyOdds"))
       if (exactMarketName === "1 X 2") {
-        this.extract1X2Odds(market, odds);
+        this.extractFullTime1X2UsingPowerQuery(market, odds);
       }
       
-      // Power Query: "1 X 2   - Half Time" market
-      if (exactMarketName === "1 X 2   - Half Time") {
-        this.extractHalfTime1X2Odds(market, odds);
+      // Power Query: if [marketDisplayName] = "1 X 2   - Half Time" then Number.FromText(Record.Field([selectionList]{1},"companyOdds"))
+      else if (exactMarketName === "1 X 2   - Half Time") {
+        this.extractHalfTime1X2UsingPowerQuery(market, odds);
       }
       
-      // Power Query: "Both Team To Score " market (exact match)
-      if (market.marketDisplayName === "Both Team To Score ") {
-        this.extractBTTSOdds(market, odds);
+      // Power Query: if [marketDisplayName] = "Both Team To Score " then Number.FromText(Record.Field([selectionList]{0},"companyOdds"))
+      else if (exactMarketName === "Both Team To Score ") {
+        this.extractBTTSUsingPowerQuery(market, odds);
       }
       
-      // Power Query: Over/Under markets (look for +2.5 in name)
-      if (exactMarketName.includes('+2.5')) {
-        this.extractOverUnderOdds(market, odds);
+      // Power Query: if Text.Contains([marketDisplayName], "+2.5") then Number.FromText(Record.Field([selectionList]{0},"companyOdds"))
+      else if (exactMarketName.includes('+2.5')) {
+        this.extractOverUnderUsingPowerQuery(market, odds);
       }
     });
     
-    console.log(`📊 Final extracted odds:`, odds);
+    console.log(`📊 Final extracted odds using Power Query method:`, odds);
     return odds;
   }
 
-  private extract1X2Odds(market: any, odds: any): void {
-    console.log(`   🎯 Processing Full Time 1X2 market`);
+  private extractFullTime1X2UsingPowerQuery(market: any, odds: any): void {
+    console.log(`   🎯 Power Query: Processing "1 X 2" market`);
     
-    // Power Query method: List.Transform([markets], each if [marketDisplayName] = "1 X 2" then...)
+    // Power Query: Record.Field([selectionList]{index},"companyOdds")
     if (market.selectionList && Array.isArray(market.selectionList)) {
       market.selectionList.forEach((selection: any, index: number) => {
-        // Power Query uses Record.Field([selectionList]{index},"companyOdds")
+        // Power Query: Number.FromText(Record.Field([selectionList]{index},"companyOdds"))
         const companyOdds = selection.companyOdds;
         const oddsValue = parseFloat(companyOdds);
         
@@ -374,6 +338,77 @@ class TotelepepExtractor {
           } else if (index === 2) {
             odds.away = oddsValue;
             console.log(`   ✅ Away (FT): ${oddsValue} (from companyOdds: ${companyOdds})`);
+          }
+        }
+      });
+    }
+  }
+
+  private extractHalfTime1X2UsingPowerQuery(market: any, odds: any): void {
+    console.log(`   🎯 Power Query: Processing "1 X 2   - Half Time" market`);
+    
+    // Power Query: Record.Field([selectionList]{1},"companyOdds") for Half Time Draw
+    if (market.selectionList && Array.isArray(market.selectionList)) {
+      market.selectionList.forEach((selection: any, index: number) => {
+        const companyOdds = selection.companyOdds;
+        const oddsValue = parseFloat(companyOdds);
+        
+        if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
+          if (index === 0) {
+            odds.homeHT = oddsValue;
+            console.log(`   ✅ Home (HT): ${oddsValue} (from companyOdds: ${companyOdds})`);
+          } else if (index === 1) {
+            odds.drawHT = oddsValue;
+            console.log(`   ✅ Draw (HT): ${oddsValue} (from companyOdds: ${companyOdds})`);
+          } else if (index === 2) {
+            odds.awayHT = oddsValue;
+            console.log(`   ✅ Away (HT): ${oddsValue} (from companyOdds: ${companyOdds})`);
+          }
+        }
+      });
+    }
+  }
+
+  private extractBTTSUsingPowerQuery(market: any, odds: any): void {
+    console.log(`   🎯 Power Query: Processing "Both Team To Score " market`);
+    
+    // Power Query: Record.Field([selectionList]{0},"companyOdds") for BTTS Yes
+    if (market.selectionList && Array.isArray(market.selectionList)) {
+      market.selectionList.forEach((selection: any, index: number) => {
+        const companyOdds = selection.companyOdds;
+        const oddsValue = parseFloat(companyOdds);
+        
+        if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
+          // Power Query: selectionList{0} = YES, selectionList{1} = NO
+          if (index === 0) {
+            odds.bttsYes = oddsValue;
+            console.log(`   ✅ BTTS Yes: ${oddsValue} (from companyOdds: ${companyOdds})`);
+          } else if (index === 1) {
+            odds.bttsNo = oddsValue;
+            console.log(`   ✅ BTTS No: ${oddsValue} (from companyOdds: ${companyOdds})`);
+          }
+        }
+      });
+    }
+  }
+
+  private extractOverUnderUsingPowerQuery(market: any, odds: any): void {
+    console.log(`   🎯 Power Query: Processing Over/Under market: "${market.marketDisplayName}"`);
+    
+    // Power Query: Record.Field([selectionList]{0},"companyOdds") for Over
+    if (market.selectionList && Array.isArray(market.selectionList)) {
+      market.selectionList.forEach((selection: any, index: number) => {
+        const companyOdds = selection.companyOdds;
+        const oddsValue = parseFloat(companyOdds);
+        
+        if (!isNaN(oddsValue) && oddsValue >= 1.01 && oddsValue <= 50) {
+          // Power Query: selectionList{0} = Over, selectionList{1} = Under
+          if (index === 0) {
+            odds.over25 = oddsValue;
+            console.log(`   ✅ Over 2.5: ${oddsValue} (from companyOdds: ${companyOdds})`);
+          } else if (index === 1) {
+            odds.under25 = oddsValue;
+            console.log(`   ✅ Under 2.5: ${oddsValue} (from companyOdds: ${companyOdds})`);
           }
         }
       });
